@@ -8,6 +8,8 @@
 
 Meet **Nano Whale**! It's the lean, mean, resource-friendly alternative built for speed and simplicity. We said "see ya later" to heavy installs and complicated dependencies. By riding the power of **WSL 2** and being whipped up entirely with **standard Python libraries** (we mean **ZERO external dependencies)**, Nano Whale gives you a streamlined, no-fuss GUI to manage your containers, images, and volumes without breaking a sweat—or your computer's performance!
 
+
+
 ## ✨ **Features**
 
 * Ultra-Lightweight: Forget the memory hogs. Minimal memory and CPU footprint compared to Docker Desktop.
@@ -20,8 +22,12 @@ Meet **Nano Whale**! It's the lean, mean, resource-friendly alternative built fo
 
 * Simple GUI: An intuitive graphical interface to view and manage your containers, images, and volumes.
 
+
 ## 🚀 Get Whale-ing: The Setup
+
+
 ### ⚠️ First Rule of Nano Whale Club: Uninstall Docker Desktop
+
 Nano Whale is the future, which means we need to clear out the past! For a conflict-free and resource-optimized environment, you must first uninstall any existing installation of Docker Desktop.
 
 Here’s the quick-and-dirty method:
@@ -34,18 +40,20 @@ Here’s the quick-and-dirty method:
 
 * Hit that **Uninstall** button!
 
-[SPACE FOR MANUAL IMAGE POSTING]
 
-Please manually insert an image here demonstrating the Docker Desktop uninstallation process.
 
 ## 📥 Installation (The Smooth Way)
-* Grab the latest **Nano_Whale.exe** from your project's Releases Page](https://google.com).
+
+* Grab the latest **Nano_Whale.exe** from your project's [HERE](https://drive.google.com/file/d/1ZuKXWoyZovPs81luZN97Dscnve3wK5S7/view?usp=sharing).
 
 * Run the executable **as Administrator (this is important!)**. Right-click and select **Run as administrator**. This is needed for the initial setup of WSL and the Docker Engine.
 
 * The app will handle the rest, making sure WSL 2 and the Docker Engine are prepped and ready to go.
 
 * Click **Uninstall**.
+
+
+
 
 ## 🔨 Exporting the Executable (Developer Instructions)
 
