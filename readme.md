@@ -40,6 +40,15 @@ Here’s the quick-and-dirty method:
 
 * Hit that **Uninstall** button!
 
+* Before installing, we need to make sure your environment is spotless! To prevent any configuration conflicts, it is **highly recommended** that you **wipe your existing WSL distribution** using the method shown in the images. This blasts away any sneaky Docker Desktop files or configs that could cause a clash with the ultra-clean Nano Whale!
+
+<p align="center">
+  <img src="./img/wsl_del_1.png" alt="Nano Whale logo" >
+</p>
+<p align="center">
+  <img src="./img/wsl_del_2.png" alt="Nano Whale logo" >
+</p>
+
 
 
 ## 📥 Installation (The Smooth Way)
