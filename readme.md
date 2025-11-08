@@ -62,7 +62,7 @@ Here’s the quick-and-dirty method:
 
 ## 📥 Installation (The Smooth Way)
 
-* Grab the latest **Nano_Whale.exe** from [HERE](https://drive.google.com/file/d/1AsQuqFKMwDRfcodZuITu2uKiE--5xbz6/view?usp=sharing).
+* Grab the latest **Nano_Whale.exe** from [HERE](https://drive.google.com/file/d/1pyhzu2eGVdBTSLz0R9oAKkdkqAcgR5fy/view?usp=sharing).
 
 * Run the executable **as Administrator (this is important!)**. Right-click and select **Run as administrator**. This is needed for the initial setup of WSL and the Docker Engine.
 
@@ -88,9 +88,11 @@ python -m venv .venv
 #### 2. Grab the Extra Gadgets
   Even though Nano Whale is 99% pure Python magic, the GUI needs a tiny helper for date picking: the tkcalendar. Grab it now!
 
+  Used Python version 3.10.11
+
 ```bash
 # Install the necessary calendar widget
-pip install tkcalendar==1.6.1
+pip install -r requirements.txt
 ```
 #### 3. Run
   Just Run!
@@ -102,7 +104,7 @@ python main.py
 ## 🔨 Exporting the Executable (Developer Instructions)
 
 ```bash
-pyinstaller --onefile --noconsole --icon=nano_whale.ico main.py
+pyinstaller --onefile --noconsole --icon=nano_whale.ico --add-data "nano_whale.ico;." main.py
 ```
 The final **Nano_Whale.exe** will be located in the newly created /dist folder.
 

@@ -23,6 +23,16 @@ DOCKER_CMD_PREFIX = ["wsl", "docker"]
 # --- END CONFIGURATION ---
 
 
+def resource_path(relative_path):
+    """Get absolute path to resource, works for dev and for PyInstaller"""
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
+
+
 class WSLDockerMonitorApp(ttk.Frame):
     """
     A Tkinter application to monitor and manage Docker resources running inside WSL.
@@ -900,8 +910,23 @@ class WSLDockerMonitorApp(ttk.Frame):
 
         log_window = tk.Toplevel(self)
         log_window.title(f"Logs: {container_name} ({container_id[:12]})")
-        log_window.iconbitmap("nano_whale.ico")
-        log_window.geometry(view_logs_size)
+        # log_window.iconbitmap("nano_whale.ico")
+        # log_window.geometry(view_logs_size)
+
+        # Set icon using resource_path
+        try:
+            icon_path = resource_path("nano_whale.ico")
+            log_window.iconbitmap(icon_path)
+        except:
+            pass
+
+        # Calculate window size after window creation
+        log_window.update_idletasks()  # Force window initialization
+        screen_width = log_window.winfo_screenwidth()
+        screen_height = log_window.winfo_screenheight()
+        window_width = screen_width // 2
+        window_height = 800
+        log_window.geometry(f"{window_width}x{window_height}")
 
         # Control Frame (sits at the top)
         control_frame = ttk.Frame(log_window)
@@ -1256,7 +1281,10 @@ if __name__ == "__main__":
 
     # Set theme for modern look
     style = ttk.Style()
-    root.iconbitmap("nano_whale.ico")
+    # root.iconbitmap("./nano_whale.ico")
+    icon_path = resource_path("nano_whale.ico")
+    root.iconbitmap(icon_path)
+
     try:
         style.theme_use("vista")  # Windows default
     except:
