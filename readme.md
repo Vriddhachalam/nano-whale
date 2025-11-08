@@ -49,11 +49,20 @@ Here’s the quick-and-dirty method:
   <img src="./img/wsl_del_2.png" alt="Nano Whale logo" >
 </p>
 
+## 🖥️ Terminal Talk: Docker Commands via WSL
+  Since Nano Whale manages Docker via WSL 2, the standard docker command is no longer available directly in your regular Windows Command Prompt or PowerShell.
+
+  To run manual Docker commands in your Windows(git bash/cmd/powershell) terminal, you must simply prefix them with wsl, For example:
+  | Instead of (Old Way) | Use (New Nano Whale Way) |
+| ------------- | ------------- |
+| ```bash docker ps```| ```bash wsl docker ps```|
+| ```bash docker images```| ```bash wsl docker images```|
+
 
 
 ## 📥 Installation (The Smooth Way)
 
-* Grab the latest **Nano_Whale.exe** from your project's [HERE](https://drive.google.com/file/d/1ZuKXWoyZovPs81luZN97Dscnve3wK5S7/view?usp=sharing).
+* Grab the latest **Nano_Whale.exe** from [HERE](https://drive.google.com/file/d/1AsQuqFKMwDRfcodZuITu2uKiE--5xbz6/view?usp=sharing).
 
 * Run the executable **as Administrator (this is important!)**. Right-click and select **Run as administrator**. This is needed for the initial setup of WSL and the Docker Engine.
 
@@ -61,8 +70,34 @@ Here’s the quick-and-dirty method:
 
 * Click **Uninstall**.
 
+## 💻 Dev Zone: Running from Source & Exporting
+### 🧪 Local Development: Running the Python Pond
+If you want to run main.py directly, you need to set up a clean, isolated environment.
 
+#### 1. Build the Isolation Tank (Virtual Environment)
+  We don't want any outside fish messing up our Python pond, so let's make a virtual environment (venv) to keep things   ultra-clean and isolated!
 
+```bash
+# Create the venv
+python -m venv .venv
+
+# Jump into the venv
+./.venv/Scripts/activate
+```
+
+#### 2. Grab the Extra Gadgets
+  Even though Nano Whale is 99% pure Python magic, the GUI needs a tiny helper for date picking: the tkcalendar. Grab it now!
+
+```bash
+# Install the necessary calendar widget
+pip install tkcalendar==1.6.1
+```
+#### 3. Run
+  Just Run!
+
+```bash
+python main.py
+```
 
 ## 🔨 Exporting the Executable (Developer Instructions)
 
