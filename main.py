@@ -6,9 +6,11 @@ import time
 import tkinter as tk
 from ctypes import windll
 from datetime import date, datetime
-from tkinter import messagebox, scrolledtext, ttk
+from tkinter import messagebox, scrolledtext
 
 import tkcalendar as tkc  # Needs: pip install tkcalendar
+import ttkbootstrap as ttk
+from ttkbootstrap.constants import *
 
 CREATE_NO_WINDOW = 0x08000000
 # Make the application DPI aware
@@ -18,7 +20,6 @@ except:
     pass
 
 # --- CONFIGURATION ---
-# The command prefix uses 'wsl docker' to target the Docker daemon running inside WSL.
 DOCKER_CMD_PREFIX = ["wsl", "docker"]
 # --- END CONFIGURATION ---
 
@@ -26,7 +27,6 @@ DOCKER_CMD_PREFIX = ["wsl", "docker"]
 def resource_path(relative_path):
     """Get absolute path to resource, works for dev and for PyInstaller"""
     try:
-        # PyInstaller creates a temp folder and stores path in _MEIPASS
         base_path = sys._MEIPASS
     except Exception:
         base_path = os.path.abspath(".")
@@ -35,79 +35,92 @@ def resource_path(relative_path):
 
 class WSLDockerMonitorApp(ttk.Frame):
     """
-    A Tkinter application to monitor and manage Docker resources running inside WSL.
-    Now includes automatic prerequisite checking and installation for WSL and Docker Engine.
+    A modern Tkinter application to monitor and manage Docker resources running inside WSL.
     """
 
     def __init__(self, master=None):
-        # Inherit from ttk.Frame and pass the master (main window)
         super().__init__(master)
-        self.master.title("Nano Whale")
-        self.master.geometry("900x700")
+        self.master.title("🐋 Nano Whale - Docker Manager")
+        self.master.geometry("1200x800")
         self.master.protocol("WM_DELETE_WINDOW", self.on_close)
         self.pack(fill="both", expand=True)
 
-        # Stores references to active log processes/threads
         self.active_log_threads = []
-
-        # Track prerequisite status
         self.prerequisites_checked = False
         self.prerequisites_ok = False
 
-        # Create UI components
         self.create_status_panel()
         self.create_main_tabs()
-
-        # Start prerequisite check in background
         self._start_prereq_check()
 
     def create_status_panel(self):
-        """Create the status/log panel at the top"""
-        status_frame = ttk.LabelFrame(self, text="System Status", padding="10")
-        status_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=(10, 5))
+        """Create the status/log panel at the top with modern styling"""
+        status_frame = ttk.Labelframe(
+            self, text="  System Status", padding="15", bootstyle="primary"
+        )
+        status_frame.pack(fill=tk.BOTH, expand=True, padx=15, pady=(15, 10))
 
         self.status_text = scrolledtext.ScrolledText(
             status_frame,
             wrap=tk.WORD,
             height=8,
-            bg="#1e1e1e",
-            fg="#ffffff",
-            font=("Consolas", 9),
+            bg="#2b2b2b",
+            fg="#e0e0e0",
+            font=("Consolas", 10),
+            relief="flat",
+            borderwidth=0,
         )
-        self.status_text.pack(fill=tk.BOTH, expand=True)
+        self.status_text.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
 
-        # Button frame for prerequisite actions
+        # Button frame
         button_frame = ttk.Frame(status_frame)
-        button_frame.pack(fill=tk.X, pady=(5, 0))
+        button_frame.pack(fill=tk.X)
 
         self.retry_check_btn = ttk.Button(
             button_frame,
-            text="Retry Prerequisites Check",
+            text="🔄 Retry Prerequisites Check",
             command=self._start_prereq_check,
             state=tk.DISABLED,
+            bootstyle="info",
+            width=25,
         )
         self.retry_check_btn.pack(side=tk.LEFT, padx=5)
 
-        ttk.Button(button_frame, text="Clear Log", command=self.clear_log).pack(
-            side=tk.LEFT, padx=5
-        )
+        ttk.Button(
+            button_frame,
+            text="🗑️ Clear Log",
+            command=self.clear_log,
+            bootstyle="secondary",
+            width=15,
+        ).pack(side=tk.LEFT, padx=5)
 
     def create_main_tabs(self):
-        """Create the main notebook with tabs"""
-        self.notebook = ttk.Notebook(self)
-        self.notebook.pack(expand=True, fill="both", padx=10, pady=(5, 10))
+        """Create the main notebook with modern tabs"""
+        self.notebook = ttk.Notebook(self, bootstyle="dark")
+        self.notebook.pack(expand=True, fill="both", padx=15, pady=(10, 15))
 
-        # Initially disable tabs until prerequisites are met
         self.create_container_tab()
         self.create_image_tab()
         self.create_volume_tab()
 
     def log(self, message, level="INFO"):
-        """Thread-safe logging to status window"""
+        """Thread-safe logging with color coding"""
 
         def update_log():
+            colors = {
+                "INFO": "#4a9eff",
+                "SUCCESS": "#00d084",
+                "ERROR": "#ff4757",
+                "WARNING": "#ffa502",
+                "INSTALL": "#a29bfe",
+                "FATAL": "#ff3838",
+            }
+            color = colors.get(level, "#e0e0e0")
             timestamp = f"[{level}] "
-            self.status_text.insert(tk.END, f"{timestamp}{message}\n")
+
+            self.status_text.tag_config(level, foreground=color)
+            self.status_text.insert(tk.END, timestamp, level)
+            self.status_text.insert(tk.END, f"{message}\n")
             self.status_text.see(tk.END)
             self.status_text.update_idletasks()
 
@@ -115,29 +128,24 @@ class WSLDockerMonitorApp(ttk.Frame):
             self.master.after(0, update_log)
 
     def clear_log(self):
-        """Clear the status log"""
         self.status_text.delete("1.0", tk.END)
 
     def on_close(self):
-        """Clean up active log threads before closing and destroy the main window."""
         for thread in self.active_log_threads:
             if thread.is_alive() and thread.log_process:
                 thread.log_process.terminate()
         self.master.destroy()
         sys.exit(0)
 
-    # --- PREREQUISITE CHECKING AND INSTALLATION ---
+    # --- PREREQUISITE CHECKING ---
 
     def _start_prereq_check(self):
-        """Start prerequisite check in background thread"""
         self.log("Starting prerequisite check...", "INFO")
         self.retry_check_btn.config(state=tk.DISABLED)
         threading.Thread(target=self._check_prerequisites_threaded, daemon=True).start()
 
     def _check_prerequisites_threaded(self):
-        """Run prerequisite checks in a separate thread"""
         all_ok = self.check_prerequisites()
-
         self.prerequisites_checked = True
         self.prerequisites_ok = all_ok
 
@@ -151,14 +159,10 @@ class WSLDockerMonitorApp(ttk.Frame):
             )
             self.master.after(0, lambda: self.disable_docker_operations())
 
-        # Re-enable retry button
         self.master.after(0, lambda: self.retry_check_btn.config(state=tk.NORMAL))
 
     def check_prerequisites(self):
-        """Check if WSL and Docker Engine are installed and working"""
         all_ok = True
-
-        # Check 1: WSL 2
         self.log("Checking WSL 2 installation...", "INFO")
         wsl_ok = self._check_wsl()
 
@@ -166,7 +170,6 @@ class WSLDockerMonitorApp(ttk.Frame):
             self.log("✗ WSL 2 is not installed or not working", "ERROR")
             self.log("Attempting to install WSL 2...", "INSTALL")
             if self._install_wsl():
-                # WSL installation requires reboot
                 all_ok = False
                 return all_ok
             else:
@@ -174,7 +177,6 @@ class WSLDockerMonitorApp(ttk.Frame):
         else:
             self.log("✓ WSL 2 is installed and working", "SUCCESS")
 
-        # Check 2: Docker Engine in WSL
         if wsl_ok:
             self.log("Checking Docker Engine in WSL...", "INFO")
             docker_ok = self._check_docker_engine()
@@ -187,7 +189,6 @@ class WSLDockerMonitorApp(ttk.Frame):
             else:
                 self.log("✓ Docker Engine is installed and working in WSL", "SUCCESS")
 
-                # Check if Docker daemon is running
                 if self._check_docker_daemon():
                     self.log("✓ Docker daemon is running", "SUCCESS")
                 else:
@@ -200,13 +201,7 @@ class WSLDockerMonitorApp(ttk.Frame):
         return all_ok
 
     def _check_wsl(self):
-        """Check if WSL 2 is installed"""
-        flags = 0
-
-        # Only set the flag on Windows (nt)
-        if os.name == "nt":
-            # Set the flag to prevent the console window from showing
-            flags = CREATE_NO_WINDOW
+        flags = CREATE_NO_WINDOW if os.name == "nt" else 0
         try:
             result = subprocess.run(
                 ["wsl", "--status"],
@@ -220,14 +215,8 @@ class WSLDockerMonitorApp(ttk.Frame):
             return False
 
     def _check_docker_engine(self):
-        """Check if Docker CLI is available in WSL"""
+        flags = CREATE_NO_WINDOW if os.name == "nt" else 0
         try:
-            flags = 0
-
-            # Only set the flag on Windows (nt)
-            if os.name == "nt":
-                # Set the flag to prevent the console window from showing
-                flags = CREATE_NO_WINDOW
             result = subprocess.run(
                 ["wsl", "docker", "--version"],
                 capture_output=True,
@@ -240,14 +229,8 @@ class WSLDockerMonitorApp(ttk.Frame):
             return False
 
     def _check_docker_daemon(self):
-        """Check if Docker daemon is running"""
+        flags = CREATE_NO_WINDOW if os.name == "nt" else 0
         try:
-            flags = 0
-
-            # Only set the flag on Windows (nt)
-            if os.name == "nt":
-                # Set the flag to prevent the console window from showing
-                flags = CREATE_NO_WINDOW
             result = subprocess.run(
                 DOCKER_CMD_PREFIX + ["ps"],
                 capture_output=True,
@@ -260,14 +243,8 @@ class WSLDockerMonitorApp(ttk.Frame):
             return False
 
     def _start_docker_daemon(self):
-        """Attempt to start Docker daemon"""
+        flags = CREATE_NO_WINDOW if os.name == "nt" else 0
         try:
-            flags = 0
-
-            # Only set the flag on Windows (nt)
-            if os.name == "nt":
-                # Set the flag to prevent the console window from showing
-                flags = CREATE_NO_WINDOW
             subprocess.run(
                 ["wsl", "sudo", "service", "docker", "start"],
                 capture_output=True,
@@ -284,12 +261,10 @@ class WSLDockerMonitorApp(ttk.Frame):
             self.log(f"Failed to start Docker daemon: {e}", "ERROR")
 
     def _install_wsl(self):
-        """Install WSL 2"""
         self.log(
             "Executing WSL installation (requires Administrator privileges)...",
             "INSTALL",
         )
-
         try:
             result = subprocess.run(
                 ["wsl", "--install"],
@@ -298,42 +273,28 @@ class WSLDockerMonitorApp(ttk.Frame):
                 timeout=1200,
                 shell=True,
             )
-
             if result.returncode == 0:
                 self.log("✓ WSL install command executed successfully", "SUCCESS")
                 self.log("=" * 60, "FATAL")
                 self.log("SYSTEM REBOOT REQUIRED!", "FATAL")
                 self.log("=" * 60, "FATAL")
-                self.log(
-                    "Please REBOOT YOUR COMPUTER to complete WSL installation.", "FATAL"
-                )
-                self.log("After rebooting, run this application again.", "FATAL")
-
                 self.master.after(
                     0,
                     lambda: messagebox.showerror(
                         "REBOOT REQUIRED",
-                        "WSL installation requires a system reboot.\n\n"
-                        "Please REBOOT YOUR COMPUTER NOW, then run this application again.",
+                        "WSL installation requires a system reboot.\n\nPlease REBOOT YOUR COMPUTER NOW.",
                     ),
                 )
                 return True
             else:
                 self.log(f"WSL installation failed: {result.stderr}", "ERROR")
-                self.log(
-                    "Please ensure this application is run as Administrator.", "ERROR"
-                )
                 return False
-
         except Exception as e:
             self.log(f"WSL installation error: {e}", "ERROR")
             return False
 
     def _install_docker_engine(self):
-        """Install Docker Engine in WSL using automated script"""
         self.log("Launching Docker Engine installation in new terminal...", "INSTALL")
-
-        # Automated installation script
         DOCKER_INSTALL_SCRIPT = (
             "echo '=== Docker Engine Installation (Password Required) ===';"
             "sudo apt update -y && sudo apt upgrade -y;"
@@ -347,53 +308,33 @@ class WSLDockerMonitorApp(ttk.Frame):
             "sudo service docker start;"
             "sudo usermod -aG docker $USER || echo 'User mod command completed';"
             "echo '=== Installation Complete ===';"
-            "echo 'IMPORTANT: Close this window and click Retry Prerequisites Check';"
             "echo 'Press Enter to close...';"
             "read;"
         )
-
-        # Escape quotes for command wrapper
         escaped_script = DOCKER_INSTALL_SCRIPT.replace('"', '\\"')
         command = f'start "" cmd /K wsl sh -c "{escaped_script}"'
 
         try:
             subprocess.Popen(command, shell=True)
-
             self.log("✓ Installation terminal launched", "SUCCESS")
-            self.log("=" * 60, "WARNING")
-            self.log("ACTION REQUIRED:", "WARNING")
-            self.log("1. Enter your WSL password in the new terminal window", "WARNING")
-            self.log("2. Wait for installation to complete", "WARNING")
-            self.log("3. Press Enter in that terminal to close it", "WARNING")
-            self.log("4. Click 'Retry Prerequisites Check' button", "WARNING")
-            self.log("=" * 60, "WARNING")
-
             self.master.after(
                 0,
                 lambda: messagebox.showinfo(
                     "Manual Step Required",
                     "A terminal window has opened for Docker Engine installation.\n\n"
-                    "Steps:\n"
-                    "1. Enter your WSL password when prompted by sudo\n"
-                    "2. Wait for installation to complete\n"
-                    "3. Press Enter to close the terminal\n"
-                    "4. Click 'Retry Prerequisites Check' in this window",
+                    "Steps:\n1. Enter your WSL password\n2. Wait for completion\n"
+                    "3. Click 'Retry Prerequisites Check'",
                 ),
             )
-
-            return False  # Indicates manual step required
-
+            return False
         except Exception as e:
             self.log(f"Failed to launch installation: {e}", "ERROR")
             return False
 
     def enable_docker_operations(self):
-        """Enable all Docker operation buttons"""
-        # This method can be extended to enable/disable specific buttons
         pass
 
     def disable_docker_operations(self):
-        """Disable Docker operation buttons when prerequisites aren't met"""
         pass
 
     # --- COMMAND EXECUTION ---
@@ -401,25 +342,18 @@ class WSLDockerMonitorApp(ttk.Frame):
     def _execute_command(
         self,
         command_parts,
-        success_message="Command executed successfully.",
+        success_message="",
         error_message="Error executing command.",
     ):
-        """
-        Executes a Docker command using the WSL prefix and handles subprocess output.
-        Returns (success_bool, output_string).
-        """
         if not self.prerequisites_ok:
             messagebox.showerror(
                 "Prerequisites Not Met",
-                "WSL and Docker Engine must be installed first.\n"
-                "Please complete the prerequisite checks.",
+                "WSL and Docker Engine must be installed first.",
             )
             return False, ""
 
         full_command = DOCKER_CMD_PREFIX + command_parts
-        flags = 0
-        if os.name == "nt":
-            flags = CREATE_NO_WINDOW  # Use the defined constant
+        flags = CREATE_NO_WINDOW if os.name == "nt" else 0
         try:
             result = subprocess.run(
                 full_command,
@@ -435,28 +369,17 @@ class WSLDockerMonitorApp(ttk.Frame):
             msg = f"{error_message}\nSTDOUT: {e.stdout.strip()}\nSTDERR: {e.stderr.strip()}"
             messagebox.showerror("Docker Error", msg)
             return False, e.stderr
-        except FileNotFoundError:
-            msg = "Error: 'wsl' command not found. WSL may not be installed properly."
-            messagebox.showerror("Execution Error", msg)
-            return False, msg
-        except subprocess.TimeoutExpired:
-            msg = "Command timed out. Docker daemon may not be responding."
-            messagebox.showerror("Timeout Error", msg)
-            return False, msg
         except Exception as e:
-            msg = f"An unexpected error occurred: {e}"
-            messagebox.showerror("Unexpected Error", msg)
-            return False, msg
+            messagebox.showerror("Error", str(e))
+            return False, str(e)
 
     def refresh_all(self):
-        """Refreshes data in all tabs."""
         if self.prerequisites_ok:
             self.refresh_containers()
             self.refresh_images()
             self.refresh_volumes()
 
     def _get_selected_id(self, tree):
-        """Retrieves the full ID (iid) of the selected item in a Treeview."""
         selected_item = tree.focus()
         if not selected_item:
             messagebox.showwarning(
@@ -465,31 +388,43 @@ class WSLDockerMonitorApp(ttk.Frame):
             return None
         return selected_item
 
-    # --- CONTAINER TAB IMPLEMENTATION ---
+    # --- CONTAINER TAB ---
 
     def create_container_tab(self):
-        container_frame = ttk.Frame(self.notebook, padding="10")
-        self.notebook.add(container_frame, text="Containers")
+        container_frame = ttk.Frame(self.notebook, padding="15")
+        self.notebook.add(container_frame, text="🐳 Containers")
 
-        # Treeview setup
+        # Header with info
+        header = ttk.Frame(container_frame)
+        header.pack(fill=tk.X, pady=(0, 10))
+        ttk.Label(
+            header, text="Container Management", font=("Segoe UI", 12, "bold")
+        ).pack(side=tk.LEFT)
+
+        # Treeview with modern styling
         columns = ("ID", "Name", "Image", "Status")
         self.containers_tree = ttk.Treeview(
-            container_frame, columns=columns, show="headings"
+            container_frame,
+            columns=columns,
+            show="headings",
+            height=15,
+            bootstyle="info",
         )
-        self.containers_tree.pack(fill="both", expand=True)
+        self.containers_tree.pack(fill="both", expand=True, pady=(0, 10))
 
         for col in columns:
-            self.containers_tree.heading(col, text=col)
-            self.containers_tree.column(col, anchor=tk.W, width=100)
+            self.containers_tree.heading(col, text=col, anchor=tk.W)
 
-        self.containers_tree.column("ID", width=100)
+        self.containers_tree.column("ID", width=120)
         self.containers_tree.column("Name", width=200)
-        self.containers_tree.column("Image", width=200)
-        self.containers_tree.column("Status", width=150)
+        self.containers_tree.column("Image", width=250)
+        self.containers_tree.column("Status", width=180)
 
-        # Scrollbar
         vsb = ttk.Scrollbar(
-            container_frame, orient="vertical", command=self.containers_tree.yview
+            container_frame,
+            orient="vertical",
+            command=self.containers_tree.yview,
+            bootstyle="info-round",
         )
         vsb.pack(side="right", fill="y")
         self.containers_tree.configure(yscrollcommand=vsb.set)
@@ -498,38 +433,26 @@ class WSLDockerMonitorApp(ttk.Frame):
         button_frame = ttk.Frame(container_frame)
         button_frame.pack(pady=10)
 
-        ttk.Button(button_frame, text="Refresh", command=self.refresh_containers).pack(
-            side=tk.LEFT, padx=5
-        )
-        ttk.Button(
-            button_frame, text="Start", command=lambda: self.manage_container("start")
-        ).pack(side=tk.LEFT, padx=5)
-        ttk.Button(
-            button_frame, text="Stop", command=lambda: self.manage_container("stop")
-        ).pack(side=tk.LEFT, padx=5)
-        ttk.Button(
-            button_frame,
-            text="Restart",
-            command=lambda: self.manage_container("restart"),
-        ).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="View Logs", command=self.show_logs).pack(
-            side=tk.LEFT, padx=5
-        )
-        ttk.Button(button_frame, text="Terminal", command=self.exec_terminal).pack(
-            side=tk.LEFT, padx=5
-        )
-        ttk.Button(
-            button_frame, text="Prune Exited", command=self.prune_containers
-        ).pack(side=tk.LEFT, padx=5)
+        buttons = [
+            ("🔄 Refresh", self.refresh_containers, "info"),
+            ("▶️ Start", lambda: self.manage_container("start"), "success"),
+            ("⏹️ Stop", lambda: self.manage_container("stop"), "danger"),
+            ("🔄 Restart", lambda: self.manage_container("restart"), "warning"),
+            ("📋 Logs", self.show_logs, "primary"),
+            ("💻 Terminal", self.exec_terminal, "secondary"),
+            ("🗑️ Prune", self.prune_containers, "danger"),
+        ]
+
+        for text, cmd, style in buttons:
+            ttk.Button(
+                button_frame, text=text, command=cmd, bootstyle=style, width=12
+            ).pack(side=tk.LEFT, padx=3)
 
     def refresh_containers(self):
-        """Fetches and displays the list of all containers (running and stopped)."""
         success, output = self._execute_command(
-            ["ps", "-a", "--format", "{{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}"],
-            success_message="Containers refreshed.",
+            ["ps", "-a", "--format", "{{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}"]
         )
 
-        # Clear existing entries
         for item in self.containers_tree.get_children():
             self.containers_tree.delete(item)
 
@@ -538,62 +461,32 @@ class WSLDockerMonitorApp(ttk.Frame):
                 if line:
                     try:
                         cid, name, image, status = line.split("\t", 3)
-                        display_id = cid[:12]
                         self.containers_tree.insert(
-                            "",
-                            tk.END,
-                            values=(display_id, name, image, status),
-                            iid=cid,
+                            "", tk.END, values=(cid[:12], name, image, status), iid=cid
                         )
                     except ValueError:
-                        print(f"Skipping malformed container output line: {line}")
+                        pass
 
     def manage_container(self, action):
-        """Performs a start, stop, or restart action on a selected container."""
         container_id = self._get_selected_id(self.containers_tree)
         if not container_id:
             return
-
-        success, _ = self._execute_command(
-            [action, container_id],
-            success_message=f"Container {action}ed successfully.",
-            error_message=f"Failed to {action} container.",
-        )
+        success, _ = self._execute_command([action, container_id])
         if success:
             self.refresh_containers()
 
     def prune_containers(self):
-        """Removes all stopped containers."""
-        if not messagebox.askyesno(
-            "Confirm Prune", "Are you sure you want to remove ALL stopped containers?"
-        ):
+        if not messagebox.askyesno("Confirm", "Remove ALL stopped containers?"):
             return
-
-        success, output = self._execute_command(
-            ["container", "prune", "-f"],
-            success_message="Exited containers pruned.",
-            error_message="Failed to prune exited containers.",
-        )
+        success, output = self._execute_command(["container", "prune", "-f"])
         if success:
-            messagebox.showinfo("Prune Success", output)
+            messagebox.showinfo("Success", "Stopped containers removed!")
             self.refresh_containers()
 
     def exec_terminal(self):
-        """
-        Executes an interactive terminal (bash) in the selected container.
-        """
         container_id = self._get_selected_id(self.containers_tree)
         if not container_id:
             return
-
-        selected_item_values = self.containers_tree.item(container_id, "values")
-        if "Up" not in selected_item_values[3]:
-            messagebox.showwarning(
-                "Container Not Running",
-                "Cannot open a terminal on a stopped container. Please start it first.",
-            )
-            return
-
         command = [
             "start",
             "wsl",
@@ -605,30 +498,42 @@ class WSLDockerMonitorApp(ttk.Frame):
             "-c",
             "exec /bin/bash || exec /bin/sh",
         ]
-
         try:
             subprocess.Popen(command, shell=True)
         except Exception as e:
-            messagebox.showerror(
-                "Execution Error", f"Failed to open terminal window: {e}"
-            )
+            messagebox.showerror("Error", f"Failed to open terminal: {e}")
 
-    # --- IMAGE TAB IMPLEMENTATION ---
+    # --- IMAGE TAB ---
 
     def create_image_tab(self):
-        image_frame = ttk.Frame(self.notebook, padding="10")
-        self.notebook.add(image_frame, text="Images")
+        image_frame = ttk.Frame(self.notebook, padding="15")
+        self.notebook.add(image_frame, text="📦 Images")
+
+        header = ttk.Frame(image_frame)
+        header.pack(fill=tk.X, pady=(0, 10))
+        ttk.Label(header, text="Image Management", font=("Segoe UI", 12, "bold")).pack(
+            side=tk.LEFT
+        )
 
         columns = ("ID", "Repository", "Tag", "Size")
-        self.images_tree = ttk.Treeview(image_frame, columns=columns, show="headings")
-        self.images_tree.pack(fill="both", expand=True)
+        self.images_tree = ttk.Treeview(
+            image_frame,
+            columns=columns,
+            show="headings",
+            height=15,
+            bootstyle="success",
+        )
+        self.images_tree.pack(fill="both", expand=True, pady=(0, 10))
 
         for col in columns:
-            self.images_tree.heading(col, text=col)
-            self.images_tree.column(col, anchor=tk.W, width=150)
+            self.images_tree.heading(col, text=col, anchor=tk.W)
+            self.images_tree.column(col, width=200)
 
         vsb = ttk.Scrollbar(
-            image_frame, orient="vertical", command=self.images_tree.yview
+            image_frame,
+            orient="vertical",
+            command=self.images_tree.yview,
+            bootstyle="success-round",
         )
         vsb.pack(side="right", fill="y")
         self.images_tree.configure(yscrollcommand=vsb.set)
@@ -636,21 +541,20 @@ class WSLDockerMonitorApp(ttk.Frame):
         button_frame = ttk.Frame(image_frame)
         button_frame.pack(pady=10)
 
-        ttk.Button(button_frame, text="Refresh", command=self.refresh_images).pack(
-            side=tk.LEFT, padx=5
-        )
-        ttk.Button(button_frame, text="Remove Image", command=self.remove_image).pack(
-            side=tk.LEFT, padx=5
-        )
-        ttk.Button(button_frame, text="Prune Dangling", command=self.prune_images).pack(
-            side=tk.LEFT, padx=5
-        )
+        buttons = [
+            ("🔄 Refresh", self.refresh_images, "info"),
+            ("🗑️ Remove", self.remove_image, "danger"),
+            ("🧹 Prune Dangling", self.prune_images, "warning"),
+        ]
+
+        for text, cmd, style in buttons:
+            ttk.Button(
+                button_frame, text=text, command=cmd, bootstyle=style, width=18
+            ).pack(side=tk.LEFT, padx=5)
 
     def refresh_images(self):
-        """Fetches and displays the list of images."""
         success, output = self._execute_command(
-            ["images", "--format", "{{.ID}}\t{{.Repository}}\t{{.Tag}}\t{{.Size}}"],
-            success_message="Images refreshed.",
+            ["images", "--format", "{{.ID}}\t{{.Repository}}\t{{.Tag}}\t{{.Size}}"]
         )
 
         for item in self.images_tree.get_children():
@@ -665,59 +569,57 @@ class WSLDockerMonitorApp(ttk.Frame):
                             "", tk.END, values=(iid[:12], repo, tag, size), iid=iid
                         )
                     except ValueError:
-                        print(f"Skipping malformed image output line: {line}")
+                        pass
 
     def remove_image(self):
-        """Removes a selected image."""
         image_id = self._get_selected_id(self.images_tree)
         if not image_id:
             return
-
-        if not messagebox.askyesno(
-            "Confirm Removal", f"Are you sure you want to remove image {image_id[:12]}?"
-        ):
+        if not messagebox.askyesno("Confirm", f"Remove image {image_id[:12]}?"):
             return
-
-        success, _ = self._execute_command(
-            ["rmi", image_id],
-            success_message="Image removed successfully.",
-            error_message="Failed to remove image. Is it in use?",
-        )
+        success, _ = self._execute_command(["rmi", image_id])
         if success:
             self.refresh_images()
 
     def prune_images(self):
-        """Removes all dangling (unused) images."""
-        if not messagebox.askyesno(
-            "Confirm Prune", "Are you sure you want to remove ALL dangling images?"
-        ):
+        if not messagebox.askyesno("Confirm", "Remove ALL dangling images?"):
             return
-
-        success, output = self._execute_command(
-            ["image", "prune", "-f"],
-            success_message="Dangling images pruned.",
-            error_message="Failed to prune images.",
-        )
+        success, output = self._execute_command(["image", "prune", "-f"])
         if success:
-            messagebox.showinfo("Prune Success", output)
+            messagebox.showinfo("Success", "Dangling images removed!")
             self.refresh_images()
 
-    # --- VOLUME TAB IMPLEMENTATION ---
+    # --- VOLUME TAB ---
 
     def create_volume_tab(self):
-        volume_frame = ttk.Frame(self.notebook, padding="10")
-        self.notebook.add(volume_frame, text="Volumes")
+        volume_frame = ttk.Frame(self.notebook, padding="15")
+        self.notebook.add(volume_frame, text="💾 Volumes")
+
+        header = ttk.Frame(volume_frame)
+        header.pack(fill=tk.X, pady=(0, 10))
+        ttk.Label(header, text="Volume Management", font=("Segoe UI", 12, "bold")).pack(
+            side=tk.LEFT
+        )
 
         columns = ("Name", "Driver")
-        self.volumes_tree = ttk.Treeview(volume_frame, columns=columns, show="headings")
-        self.volumes_tree.pack(fill="both", expand=True)
+        self.volumes_tree = ttk.Treeview(
+            volume_frame,
+            columns=columns,
+            show="headings",
+            height=15,
+            bootstyle="warning",
+        )
+        self.volumes_tree.pack(fill="both", expand=True, pady=(0, 10))
 
         for col in columns:
-            self.volumes_tree.heading(col, text=col)
-            self.volumes_tree.column(col, anchor=tk.W, width=300)
+            self.volumes_tree.heading(col, text=col, anchor=tk.W)
+            self.volumes_tree.column(col, width=400)
 
         vsb = ttk.Scrollbar(
-            volume_frame, orient="vertical", command=self.volumes_tree.yview
+            volume_frame,
+            orient="vertical",
+            command=self.volumes_tree.yview,
+            bootstyle="warning-round",
         )
         vsb.pack(side="right", fill="y")
         self.volumes_tree.configure(yscrollcommand=vsb.set)
@@ -725,21 +627,20 @@ class WSLDockerMonitorApp(ttk.Frame):
         button_frame = ttk.Frame(volume_frame)
         button_frame.pack(pady=10)
 
-        ttk.Button(button_frame, text="Refresh", command=self.refresh_volumes).pack(
-            side=tk.LEFT, padx=5
-        )
-        ttk.Button(button_frame, text="Remove Volume", command=self.remove_volume).pack(
-            side=tk.LEFT, padx=5
-        )
-        ttk.Button(button_frame, text="Prune Unused", command=self.prune_volumes).pack(
-            side=tk.LEFT, padx=5
-        )
+        buttons = [
+            ("🔄 Refresh", self.refresh_volumes, "info"),
+            ("🗑️ Remove", self.remove_volume, "danger"),
+            ("🧹 Prune Unused", self.prune_volumes, "warning"),
+        ]
+
+        for text, cmd, style in buttons:
+            ttk.Button(
+                button_frame, text=text, command=cmd, bootstyle=style, width=18
+            ).pack(side=tk.LEFT, padx=5)
 
     def refresh_volumes(self):
-        """Fetches and displays the list of volumes."""
         success, output = self._execute_command(
-            ["volume", "ls", "--format", "{{.Name}}\t{{.Driver}}"],
-            success_message="Volumes refreshed.",
+            ["volume", "ls", "--format", "{{.Name}}\t{{.Driver}}"]
         )
 
         for item in self.volumes_tree.get_children():
@@ -754,79 +655,56 @@ class WSLDockerMonitorApp(ttk.Frame):
                             "", tk.END, values=(name, driver), iid=name
                         )
                     except ValueError:
-                        print(f"Skipping malformed volume output line: {line}")
+                        pass
 
     def remove_volume(self):
-        """Removes a selected volume."""
         volume_name = self._get_selected_id(self.volumes_tree)
         if not volume_name:
             return
-
-        if not messagebox.askyesno(
-            "Confirm Removal", f"Are you sure you want to remove volume {volume_name}?"
-        ):
+        if not messagebox.askyesno("Confirm", f"Remove volume {volume_name}?"):
             return
-
-        success, _ = self._execute_command(
-            ["volume", "rm", volume_name],
-            success_message="Volume removed successfully.",
-            error_message="Failed to remove volume. Is it in use?",
-        )
+        success, _ = self._execute_command(["volume", "rm", volume_name])
         if success:
             self.refresh_volumes()
 
     def prune_volumes(self):
-        """Removes all unused volumes."""
-        if not messagebox.askyesno(
-            "Confirm Prune", "Are you sure you want to remove ALL unused volumes?"
-        ):
+        if not messagebox.askyesno("Confirm", "Remove ALL unused volumes?"):
             return
-
-        success, output = self._execute_command(
-            ["volume", "prune", "-f"],
-            success_message="Unused volumes pruned.",
-            error_message="Failed to prune volumes.",
-        )
+        success, output = self._execute_command(["volume", "prune", "-f"])
         if success:
-            messagebox.showinfo("Prune Success", output)
+            messagebox.showinfo("Success", "Unused volumes removed!")
             self.refresh_volumes()
 
-    # --- LOGS IMPLEMENTATION ---
+    # --- LOGS ---
 
     def _get_wsl_current_time(self):
-        """Fetches the current UTC time from WSL using the required format."""
-        command = ["date", "-u", "+%Y-%m-%dT%H:%M:%S.%NZ"]
         try:
-            result = subprocess.run(command, capture_output=True, text=True, check=True)
+            result = subprocess.run(
+                ["date", "-u", "+%Y-%m-%dT%H:%M:%S.%NZ"],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
             return result.stdout.strip()
-        except (subprocess.CalledProcessError, FileNotFoundError) as e:
-            print(f"Error fetching WSL date: {e}")
+        except:
             return None
 
     def _safe_remove_log_thread(self, thread_instance):
-        """Safely removes a thread instance from the active list."""
         try:
             if thread_instance in self.active_log_threads:
                 self.active_log_threads.remove(thread_instance)
         except Exception as e:
-            # Log or print the error, but prevent the program crash
-            print(
-                f"Warning: Failed to safely remove thread {thread_instance.name}: {e}"
-            )
+            print(f"Warning: Failed to remove thread: {e}")
 
     def _show_datetime_picker(self, master, target_var):
-        """Opens a Toplevel window with a Calendar and time Spinboxes."""
-
         cal_window = tk.Toplevel(master)
         cal_window.title("Select Date and Time")
         cal_window.transient(master)
 
-        # Variables for time
         hour_var = tk.IntVar(value=datetime.now().hour)
         minute_var = tk.IntVar(value=datetime.now().minute)
         second_var = tk.IntVar(value=datetime.now().second)
 
-        # 1. Calendar Widget
         today = date.today()
         cal = tkc.Calendar(
             cal_window,
@@ -838,11 +716,9 @@ class WSLDockerMonitorApp(ttk.Frame):
         )
         cal.pack(pady=10, padx=10)
 
-        # 2. Time Input Frame
         time_frame = ttk.Frame(cal_window)
         time_frame.pack(pady=5, padx=10)
 
-        # Hour Spinbox
         ttk.Label(time_frame, text="Time (HH:MM:SS):").pack(side=tk.LEFT)
         ttk.Spinbox(
             time_frame,
@@ -854,8 +730,6 @@ class WSLDockerMonitorApp(ttk.Frame):
             format="%02.0f",
         ).pack(side=tk.LEFT, padx=2)
         ttk.Label(time_frame, text=":").pack(side=tk.LEFT)
-
-        # Minute Spinbox
         ttk.Spinbox(
             time_frame,
             from_=0,
@@ -866,8 +740,6 @@ class WSLDockerMonitorApp(ttk.Frame):
             format="%02.0f",
         ).pack(side=tk.LEFT, padx=2)
         ttk.Label(time_frame, text=":").pack(side=tk.LEFT)
-
-        # Second Spinbox
         ttk.Spinbox(
             time_frame,
             from_=0,
@@ -879,29 +751,19 @@ class WSLDockerMonitorApp(ttk.Frame):
         ).pack(side=tk.LEFT, padx=2)
 
         def set_datetime():
-            # Get selected date (YYYY-MM-DD)
             selected_date_str = cal.get_date()
-
-            # Format time with padding and ensure UTC/Zulu 'Z' suffix
-            time_str = (
-                f"{hour_var.get():02d}:"
-                f"{minute_var.get():02d}:"
-                f"{second_var.get():02d}.000000000Z"  # Add nanosecond precision and Z for RFC3339
-            )
-
-            # Combine into RFC3339 format
+            time_str = f"{hour_var.get():02d}:{minute_var.get():02d}:{second_var.get():02d}.000000000Z"
             new_timestamp = f"{selected_date_str}T{time_str}"
-
             target_var.set(new_timestamp)
             cal_window.destroy()
 
-        ttk.Button(cal_window, text="Set Datetime", command=set_datetime).pack(pady=10)
+        ttk.Button(
+            cal_window, text="Set Datetime", command=set_datetime, bootstyle="success"
+        ).pack(pady=10)
         cal_window.grab_set()
         master.wait_window(cal_window)
 
-    # --- LOGS IMPLEMENTATION ---
     def show_logs(self):
-        """Opens a Toplevel window to stream and watch logs for a selected container."""
         container_id = self._get_selected_id(self.containers_tree)
         if not container_id:
             return
@@ -909,119 +771,112 @@ class WSLDockerMonitorApp(ttk.Frame):
         container_name = self.containers_tree.item(container_id, "values")[1]
 
         log_window = tk.Toplevel(self)
-        log_window.title(f"Logs: {container_name} ({container_id[:12]})")
-        # log_window.iconbitmap("nano_whale.ico")
-        # log_window.geometry(view_logs_size)
+        log_window.title(f"📋 Logs: {container_name} ({container_id[:12]})")
 
-        # Set icon using resource_path
         try:
             icon_path = resource_path("nano_whale.ico")
             log_window.iconbitmap(icon_path)
         except:
             pass
 
-        # Calculate window size after window creation
-        log_window.update_idletasks()  # Force window initialization
+        log_window.update_idletasks()
         screen_width = log_window.winfo_screenwidth()
-        screen_height = log_window.winfo_screenheight()
         window_width = screen_width // 2
         window_height = 800
         log_window.geometry(f"{window_width}x{window_height}")
 
-        # Control Frame (sits at the top)
-        control_frame = ttk.Frame(log_window)
-        control_frame.pack(fill="x", padx=10, pady=5)
+        # Control Frame with modern styling
+        control_frame = ttk.Labelframe(
+            log_window, text="  Log Controls", padding="10", bootstyle="primary"
+        )
+        control_frame.pack(fill="x", padx=15, pady=10)
 
-        # Text widget for logs
         log_text = scrolledtext.ScrolledText(
             log_window,
             wrap=tk.WORD,
             state=tk.NORMAL,
             bg="#1e1e1e",
-            fg="#ffffff",
+            fg="#e0e0e0",
             font=("Consolas", 10),
+            relief="flat",
+            borderwidth=0,
         )
-        log_text.pack(expand=True, fill="both", padx=10, pady=10)
+        log_text.pack(expand=True, fill="both", padx=15, pady=(0, 10))
 
-        # --- Variables and Entry Fields ---
         from_time_var = tk.StringVar(value="")
         to_time_var = tk.StringVar(value="")
-
-        # ⬅️ NEW: Checkbox Variable, default to True (checked/on)
         timestamp_var = tk.BooleanVar(value=True)
 
-        # Add a checkbutton command that explicitly doesn't clear the display text
+        # Top row - timestamp checkbox
+        top_row = ttk.Frame(control_frame)
+        top_row.pack(fill=tk.X, pady=(0, 5))
+
         ttk.Checkbutton(
-            control_frame,
-            text="Show Timestamps (-t)",
+            top_row,
+            text="🕒 Show Timestamps",
             variable=timestamp_var,
-            # ⬅️ CHANGE: Use a new mode 'timestamp_toggle' which won't clear the text
+            bootstyle="primary-round-toggle",
             command=lambda: restart_log_stream(mode="timestamp_toggle"),
-        ).pack(side=tk.LEFT, padx=10)
+        ).pack(side=tk.LEFT, padx=5)
 
-        # From Entry and Picker
-        ttk.Label(control_frame, text="From (RFC3339):").pack(side=tk.LEFT, padx=5)
-        from_entry = ttk.Entry(control_frame, textvariable=from_time_var, width=25)
-        from_entry.pack(side=tk.LEFT, padx=1)
+        # Middle row - date pickers
+        date_row = ttk.Frame(control_frame)
+        date_row.pack(fill=tk.X, pady=5)
+
+        ttk.Label(date_row, text="From:").pack(side=tk.LEFT, padx=(5, 2))
+        from_entry = ttk.Entry(date_row, textvariable=from_time_var, width=22)
+        from_entry.pack(side=tk.LEFT, padx=2)
         ttk.Button(
-            control_frame,
-            text="📅🕓",  # ⬅️ Updated Button Text
-            # ⬅️ Call the new datetime picker function
+            date_row,
+            text="📅",
+            width=3,
             command=lambda: self._show_datetime_picker(log_window, from_time_var),
-        ).pack(side=tk.LEFT, padx=(0, 1))
+            bootstyle="info",
+        ).pack(side=tk.LEFT, padx=2)
 
-        # To Entry and Picker
-        ttk.Label(control_frame, text="To (RFC3339):").pack(side=tk.LEFT, padx=5)
-        to_entry = ttk.Entry(control_frame, textvariable=to_time_var, width=25)
-        to_entry.pack(side=tk.LEFT, padx=1)
+        ttk.Label(date_row, text="To:").pack(side=tk.LEFT, padx=(10, 2))
+        to_entry = ttk.Entry(date_row, textvariable=to_time_var, width=22)
+        to_entry.pack(side=tk.LEFT, padx=2)
         ttk.Button(
-            control_frame,
-            text="📅🕗",  # ⬅️ Updated Button Text
-            # ⬅️ Call the new datetime picker function
+            date_row,
+            text="📅",
+            width=3,
             command=lambda: self._show_datetime_picker(log_window, to_time_var),
-        ).pack(side=tk.LEFT, padx=(0, 1))
+            bootstyle="info",
+        ).pack(side=tk.LEFT, padx=2)
 
-        # Apply Filter Button
-        # Note: Ensure restart_log_stream is defined or accessible here
         ttk.Button(
-            control_frame,
-            text="Apply Range Filter",
+            date_row,
+            text="Apply Range",
             command=lambda: restart_log_stream(mode="range"),
-        ).pack(side=tk.LEFT, padx=10)
+            bootstyle="success",
+            width=12,
+        ).pack(side=tk.LEFT, padx=(10, 5))
 
         def thread_exit_callback(thread_instance):
             self._safe_remove_log_thread(thread_instance)
 
-        # --- Internal State Management ---
-        # Initial log thread setup (None for full logs)
         log_thread = LogStreamer(
             container_id,
             log_text,
-            # lambda: self.active_log_threads.remove(log_thread),
             lambda instance: thread_exit_callback(instance),
-            since_time=None,  # Start with full historical logs
+            since_time=None,
             until_time=None,
             show_timestamps=timestamp_var.get(),
         )
         self.active_log_threads.append(log_thread)
         log_thread.start()
 
-        # --- Core Log Stream Management Functions ---
-
         def restart_log_stream(mode="clear", since_time=None, until_time=None):
-            """Stops the current stream and starts a new one based on the mode."""
             nonlocal log_thread
-
-            # ⬅️ Capture the current timestamp state from the UI
             show_timestamps = timestamp_var.get()
-            # 1. Stop the current stream
             log_thread.terminate()
 
             clear_required = mode in ("clear", "start", "range")
 
             if clear_required:
                 log_text.config(state=tk.NORMAL)
-                log_text.delete("1.0", tk.END)  # ⬅️ WIPE SCREEN ONLY HERE
+                log_text.delete("1.0", tk.END)
                 log_text.config(state=tk.DISABLED)
 
             log_message = ""
@@ -1039,53 +894,34 @@ class WSLDockerMonitorApp(ttk.Frame):
                 )
 
             elif mode == "clear" or mode == "current":
-                # These modes force a clear and stream from the current moment
                 since_time = self._get_wsl_current_time()
                 until_time = None
-
                 if not since_time:
                     log_text.after(
                         0,
                         log_text.insert,
                         tk.END,
-                        f"--- ERROR: Could not fetch time. Stream failed. ---\n",
+                        "--- ERROR: Could not fetch time ---\n",
                     )
-                    log_text.see(tk.END)
                     return
+                log_message = f"--- Streaming from current moment: {since_time} ---"
 
-                log_message = f"--- Display cleared. Streaming from current moment: {since_time} ---"
-
-            elif (
-                mode == "timestamp_toggle"
-            ):  # ⬅️ This mode should inherit previous filters but NOT clear
-                # Inherit the previous filter settings
+            elif mode == "timestamp_toggle":
                 since_time = log_thread.since_time
                 until_time = log_thread.until_time
-
-                log_message = f"--- Stream format updated. Timestamps are now {'ON' if show_timestamps else 'OFF'} ---"
-
-            else:
-                # If we don't clear, insert a separator for clarity
-                log_text.after(
-                    0, log_text.insert, tk.END, "\n--- Stream format updated ---\n"
+                log_message = (
+                    f"--- Timestamps are now {'ON' if show_timestamps else 'OFF'} ---"
                 )
-                log_text.see(tk.END)
 
-            # 3. Create and start the new thread
             new_log_thread = LogStreamer(
                 container_id,
                 log_text,
-                # lambda: self.active_log_threads.remove(new_log_thread),
-                lambda instance: thread_exit_callback(
-                    new_log_thread
-                ),  # ⬅️ Use the safe callback
+                lambda instance: thread_exit_callback(new_log_thread),
                 since_time=since_time,
-                until_time=until_time,  # Pass new until_time to LogStreamer
-                # ⬅️ PASS THE TIMESTAMP STATE
+                until_time=until_time,
                 show_timestamps=show_timestamps,
             )
 
-            # 4. Update tracking and bindings
             try:
                 self.active_log_threads.remove(log_thread)
             except ValueError:
@@ -1095,73 +931,43 @@ class WSLDockerMonitorApp(ttk.Frame):
             log_window.bind("<Destroy>", lambda e: new_log_thread.terminate())
             new_log_thread.start()
 
-            # 5. Update reference and notify user
-            # nonlocal log_thread
             log_thread = new_log_thread
-            # Insert separator if we did NOT clear the screen (e.g., in timestamp_toggle mode)
+
             if not clear_required:
                 log_text.config(state=tk.NORMAL)
-                log_text.insert(tk.END, "\n-------------------------------------\n")
+                log_text.insert(tk.END, "\n" + "=" * 50 + "\n")
 
-            # log_text.after(0, log_text.insert, tk.END, log_message + "\n")
             log_text.after(
-                0, log_text.insert, tk.END, "\n\n======== NEW STREAM STARTED ========\n"
+                0, log_text.insert, tk.END, "\n======== NEW STREAM STARTED ========\n"
             )
             log_text.after(0, log_text.insert, tk.END, log_message + "\n")
             log_text.see(tk.END)
 
-        # Initial log thread setup (must happen after restart_log_stream definition)
-        log_thread = LogStreamer(
-            container_id,
-            log_text,
-            lambda instance: self._safe_remove_log_thread(instance),
-            since_time=None,  # Start with full historical logs
-            until_time=None,
-            show_timestamps=timestamp_var.get(),  # ⬅️ Initial state
-        )
-        self.active_log_threads.append(log_thread)
-        log_thread.start()
-
-        # --- Bottom Button Frame ---
+        # Bottom button frame with modern styling
         button_frame = ttk.Frame(log_window)
-        button_frame.pack(pady=5)
+        button_frame.pack(pady=10, padx=15)
 
-        # Option 2: All logs from start
-        ttk.Button(
-            button_frame,
-            text="1. Show All Logs (from Start)",
-            command=lambda: restart_log_stream(mode="start"),
-        ).pack(side=tk.LEFT, padx=5)
+        buttons = [
+            ("📜 All Logs", lambda: restart_log_stream(mode="start"), "info"),
+            (
+                "▶️ Stream from Now",
+                lambda: restart_log_stream(mode="current"),
+                "success",
+            ),
+            ("🔄 Clear & Restart", lambda: restart_log_stream(mode="clear"), "warning"),
+            ("❌ Close", log_window.destroy, "danger"),
+        ]
 
-        # Option 3: Current WSL time (same as clear_display)
-        ttk.Button(
-            button_frame,
-            text="2. Stream from Now",
-            command=lambda: restart_log_stream(mode="current"),
-        ).pack(side=tk.LEFT, padx=5)
+        for text, cmd, style in buttons:
+            ttk.Button(
+                button_frame, text=text, command=cmd, bootstyle=style, width=18
+            ).pack(side=tk.LEFT, padx=3)
 
-        # General Clear Display Button (using current time, as requested)
-        ttk.Button(
-            button_frame,
-            text="Clear Display / Restart Stream",
-            command=lambda: restart_log_stream(mode="clear"),
-        ).pack(side=tk.LEFT, padx=(20, 5))
-
-        ttk.Button(button_frame, text="Close Window", command=log_window.destroy).pack(
-            side=tk.LEFT, padx=5
-        )
-
-        log_window.bind(
-            "<Destroy>",
-            lambda e: log_thread.terminate(),
-        )
-
-
-# --- LogStreamer Class Definition ---
+        log_window.bind("<Destroy>", lambda e: log_thread.terminate())
 
 
 class LogStreamer(threading.Thread):
-    """A thread to stream Docker logs using subprocess.Popen."""
+    """A thread to stream Docker logs"""
 
     def __init__(
         self,
@@ -1178,7 +984,7 @@ class LogStreamer(threading.Thread):
         self.on_exit_callback = on_exit_callback
         self.since_time = since_time
         self.until_time = until_time
-        self.show_timestamps = show_timestamps  # ⬅️ NEW: Store timestamp state
+        self.show_timestamps = show_timestamps
         self.log_process = None
         self.daemon = True
         self.running = True
@@ -1186,11 +992,9 @@ class LogStreamer(threading.Thread):
     def run(self):
         command = DOCKER_CMD_PREFIX + ["logs"]
 
-        # ⬅️ ADD -t FLAG CONDITIONALLY
         if self.show_timestamps:
             command.append("-t")
 
-        # Only use -f (follow) if we are streaming indefinitely (no until filter)
         if not self.until_time:
             command.append("-f")
 
@@ -1198,12 +1002,9 @@ class LogStreamer(threading.Thread):
             command.append(f"--since={self.since_time}")
 
         if self.until_time:
-            command.append(f"--until={self.until_time}")  # ⬅️ New: Add --until
+            command.append(f"--until={self.until_time}")
 
         command.append(self.container_id)
-
-        # Example command (Range): ["docker", "logs", "--since=T1", "--until=T2", "id"]
-        # Example command (Follow): ["docker", "logs", "-f", "id"]
 
         try:
             self.log_process = subprocess.Popen(
@@ -1221,25 +1022,21 @@ class LogStreamer(threading.Thread):
                     break
                 self.text_widget.after(0, self.append_text, line)
 
-            # If the log process stops naturally (i.e., when using --until)
             if self.log_process.wait() == 0 and self.until_time:
                 self.text_widget.after(
                     0,
                     self.append_text,
-                    f"\n--- Log stream finished at {self.until_time}. No more logs. ---\n",
+                    f"\n--- Log stream finished at {self.until_time} ---\n",
                 )
 
         except Exception as e:
-            self.text_widget.after(
-                0, self.append_text, f"\n--- ERROR: Log Streamer failed: {e} ---\n"
-            )
+            self.text_widget.after(0, self.append_text, f"\n--- ERROR: {e} ---\n")
         finally:
             self.running = False
             if self.log_process and self.log_process.poll() is None:
                 self.log_process.terminate()
             self.on_exit_callback(self)
 
-    # append_text and terminate methods remain the same
     def append_text(self, content):
         self.text_widget.config(state=tk.NORMAL)
         self.text_widget.insert(tk.END, content)
@@ -1253,49 +1050,28 @@ class LogStreamer(threading.Thread):
 
 
 if __name__ == "__main__":
-    # Check if running as Administrator (required for WSL installation)
     if os.name == "nt":
         try:
             is_admin = windll.shell32.IsUserAnAdmin()
             if not is_admin:
                 print("WARNING: Not running as Administrator.")
-                print("WSL installation will require Administrator privileges.")
         except:
             pass
 
-    # Create root window FIRST before setting style
-    root = tk.Tk()
+    # Create root with ttkbootstrap theme
+    root = ttk.Window(themename="darkly")  # Modern dark theme
+    root.title("🐋 Nano Whale - Docker Manager")
 
-    # 2. Get the screen dimensions in pixels
-    screen_width = root.winfo_screenwidth()
-    screen_height = root.winfo_screenheight()
-
-    # 3. Calculate the desired window dimensions
-    # Half the screen width
-    window_width = screen_width // 2
-    # Keeping your requested height of 800 pixels
-    window_height = 800
-
-    # 4. Construct the geometry string in the format "WidthxHeight"
-    view_logs_size = f"{window_width}x{window_height}"
-
-    # Set theme for modern look
-    style = ttk.Style()
-    # root.iconbitmap("./nano_whale.ico")
-    icon_path = resource_path("nano_whale.ico")
-    root.iconbitmap(icon_path)
-
+    # Set icon
     try:
-        style.theme_use("vista")  # Windows default
-    except:
-        style.theme_use("clam")  # Cross-platform fallback
+        icon_path = resource_path("nano_whale.ico")
+        root.iconbitmap(icon_path)
+    except Exception as e:
+        print(f"Could not set icon: {e}")
 
-    # root = tk.Tk()
     try:
         app = WSLDockerMonitorApp(master=root)
         root.mainloop()
     except Exception as e:
-        messagebox.showerror(
-            "Application Error", f"The application failed to start: {e}"
-        )
+        messagebox.showerror("Application Error", f"Failed to start: {e}")
         root.destroy()
