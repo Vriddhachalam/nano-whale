@@ -492,8 +492,11 @@ class WSLDockerMonitorApp(ttk.Frame):
             container_frame, orient="vertical", command=self.containers_tree.yview
         )
         vsb.pack(side="right", fill="y")
-        self.containers_tree.configure(yscrollcommand=vsb.set)
 
+        self.containers_tree.configure(yscrollcommand=vsb.set)
+        self.containers_tree.bind(
+            "<Control-a>", lambda e: self.select_all(self.containers_tree)
+        )
         # Button Frame
         button_frame = ttk.Frame(container_frame)
         button_frame.pack(pady=10)
@@ -549,18 +552,67 @@ class WSLDockerMonitorApp(ttk.Frame):
                         print(f"Skipping malformed container output line: {line}")
 
     def manage_container(self, action):
-        """Performs a start, stop, or restart action on a selected container."""
-        container_id = self._get_selected_id(self.containers_tree)
-        if not container_id:
+        """Performs a start, stop, or restart action on selected container(s)."""
+        selected_containers = self.containers_tree.selection()
+
+        if not selected_containers:
+            messagebox.showwarning(
+                "Selection Required", "Please select container(s) first."
+            )
             return
 
-        success, _ = self._execute_command(
-            [action, container_id],
-            success_message=f"Container {action}ed successfully.",
-            error_message=f"Failed to {action} container.",
-        )
-        if success:
-            self.refresh_containers()
+        # count = len(selected_containers)
+
+        # Check restart policy before stopping (for multiple containers)
+        if action == "stop":
+            flags = CREATE_NO_WINDOW if os.name == "nt" else 0
+            containers_with_restart = []
+
+            try:
+                for container_id in selected_containers:
+                    result = subprocess.run(
+                        DOCKER_CMD_PREFIX
+                        + [
+                            "inspect",
+                            "--format",
+                            "{{.HostConfig.RestartPolicy.Name}}",
+                            container_id,
+                        ],
+                        capture_output=True,
+                        text=True,
+                        creationflags=flags,
+                    )
+                    restart_policy = result.stdout.strip()
+                    if restart_policy in ["always", "unless-stopped"]:
+                        containers_with_restart.append(container_id)
+
+                if containers_with_restart:
+                    response = messagebox.askyesno(
+                        "Restart Policy Detected",
+                        f"{len(containers_with_restart)} container(s) have restart policies.\n\n"
+                        f"They will automatically restart after stopping.\n"
+                        f"Remove restart policies before stopping?",
+                    )
+                    if response:
+                        for container_id in containers_with_restart:
+                            subprocess.run(
+                                DOCKER_CMD_PREFIX
+                                + ["update", "--restart=no", container_id],
+                                capture_output=True,
+                                creationflags=flags,
+                            )
+            except:
+                pass
+
+        # Perform action on all selected containers
+        for container_id in selected_containers:
+            self._execute_command(
+                [action, container_id],
+                success_message=f"Container {container_id[:12]} {action}ed successfully.",
+                error_message=f"Failed to {action} container {container_id[:12]}.",
+            )
+
+        self.refresh_containers()
 
     def prune_containers(self):
         """Removes all stopped containers."""
@@ -632,6 +684,9 @@ class WSLDockerMonitorApp(ttk.Frame):
         )
         vsb.pack(side="right", fill="y")
         self.images_tree.configure(yscrollcommand=vsb.set)
+        self.images_tree.bind(
+            "<Control-a>", lambda e: self.select_all(self.images_tree)
+        )
 
         button_frame = ttk.Frame(image_frame)
         button_frame.pack(pady=10)
@@ -645,6 +700,11 @@ class WSLDockerMonitorApp(ttk.Frame):
         ttk.Button(button_frame, text="Prune Dangling", command=self.prune_images).pack(
             side=tk.LEFT, padx=5
         )
+
+    def select_all(self, tree):
+        """Select all items in a treeview."""
+        tree.selection_set(tree.get_children())
+        return "break"  # Prevent default behavior
 
     def refresh_images(self):
         """Fetches and displays the list of images."""
@@ -668,23 +728,29 @@ class WSLDockerMonitorApp(ttk.Frame):
                         print(f"Skipping malformed image output line: {line}")
 
     def remove_image(self):
-        """Removes a selected image."""
-        image_id = self._get_selected_id(self.images_tree)
-        if not image_id:
+        """Removes selected image(s)."""
+        selected_images = self.images_tree.selection()
+
+        if not selected_images:
+            messagebox.showwarning(
+                "Selection Required", "Please select image(s) first."
+            )
             return
 
+        count = len(selected_images)
         if not messagebox.askyesno(
-            "Confirm Removal", f"Are you sure you want to remove image {image_id[:12]}?"
+            "Confirm Removal", f"Are you sure you want to remove {count} image(s)?"
         ):
             return
 
-        success, _ = self._execute_command(
-            ["rmi", image_id],
-            success_message="Image removed successfully.",
-            error_message="Failed to remove image. Is it in use?",
-        )
-        if success:
-            self.refresh_images()
+        for image_id in selected_images:
+            self._execute_command(
+                ["rmi", "-f", image_id],  # Add -f flag to force removal
+                success_message=f"Image {image_id[:12]} removed successfully.",
+                error_message=f"Failed to remove image {image_id[:12]}.",
+            )
+
+        self.refresh_images()
 
     def prune_images(self):
         """Removes all dangling (unused) images."""
@@ -721,6 +787,9 @@ class WSLDockerMonitorApp(ttk.Frame):
         )
         vsb.pack(side="right", fill="y")
         self.volumes_tree.configure(yscrollcommand=vsb.set)
+        self.volumes_tree.bind(
+            "<Control-a>", lambda e: self.select_all(self.volumes_tree)
+        )
 
         button_frame = ttk.Frame(volume_frame)
         button_frame.pack(pady=10)
@@ -757,23 +826,37 @@ class WSLDockerMonitorApp(ttk.Frame):
                         print(f"Skipping malformed volume output line: {line}")
 
     def remove_volume(self):
-        """Removes a selected volume."""
-        volume_name = self._get_selected_id(self.volumes_tree)
-        if not volume_name:
+        """Removes selected volume(s)."""
+        selected_volumes = self.volumes_tree.selection()
+
+        if not selected_volumes:
+            messagebox.showwarning(
+                "Selection Required", "Please select volume(s) first."
+            )
             return
 
-        if not messagebox.askyesno(
-            "Confirm Removal", f"Are you sure you want to remove volume {volume_name}?"
-        ):
-            return
-
-        success, _ = self._execute_command(
-            ["volume", "rm", volume_name],
-            success_message="Volume removed successfully.",
-            error_message="Failed to remove volume. Is it in use?",
+        count = len(selected_volumes)
+        response = messagebox.askyesnocancel(
+            "Confirm Removal",
+            f"Remove {count} volume(s)?\n\n"
+            f"Yes = Normal remove\n"
+            f"No = Force remove (removes even if in use)\n"
+            f"Cancel = Abort",
         )
-        if success:
-            self.refresh_volumes()
+
+        if response is None:  # Cancel
+            return
+
+        force_flag = ["-f"] if response is False else []
+
+        for volume_name in selected_volumes:
+            self._execute_command(
+                ["volume", "rm"] + force_flag + [volume_name],
+                success_message=f"Volume {volume_name} removed successfully.",
+                error_message=f"Failed to remove volume {volume_name}.",
+            )
+
+        self.refresh_volumes()
 
     def prune_volumes(self):
         """Removes all unused volumes."""
@@ -992,20 +1075,6 @@ class WSLDockerMonitorApp(ttk.Frame):
         def thread_exit_callback(thread_instance):
             self._safe_remove_log_thread(thread_instance)
 
-        # --- Internal State Management ---
-        # Initial log thread setup (None for full logs)
-        log_thread = LogStreamer(
-            container_id,
-            log_text,
-            # lambda: self.active_log_threads.remove(log_thread),
-            lambda instance: thread_exit_callback(instance),
-            since_time=None,  # Start with full historical logs
-            until_time=None,
-            show_timestamps=timestamp_var.get(),
-        )
-        self.active_log_threads.append(log_thread)
-        log_thread.start()
-
         # --- Core Log Stream Management Functions ---
 
         def restart_log_stream(mode="clear", since_time=None, until_time=None):
@@ -1017,29 +1086,20 @@ class WSLDockerMonitorApp(ttk.Frame):
             # 1. Stop the current stream
             log_thread.terminate()
 
-            clear_required = mode in ("clear", "start", "range")
-
-            if clear_required:
-                log_text.config(state=tk.NORMAL)
-                log_text.delete("1.0", tk.END)  # ⬅️ WIPE SCREEN ONLY HERE
-                log_text.config(state=tk.DISABLED)
-
-            log_message = ""
+            log_text.config(state=tk.NORMAL)
+            log_text.delete("1.0", tk.END)  # ⬅️ WIPE SCREEN ONLY HERE
+            log_text.config(state=tk.DISABLED)
 
             if mode == "range":
                 since_time = from_time_var.get() if from_time_var.get() else None
                 until_time = to_time_var.get() if to_time_var.get() else None
-                log_message = f"--- Streaming log range: FROM {since_time or 'START'} TO {until_time or 'NOW'} ---"
 
-            elif mode == "start":
+            elif mode == "history":
                 since_time = None
                 until_time = None
-                log_message = (
-                    "--- Streaming ALL available logs from container start ---"
-                )
 
-            elif mode == "clear" or mode == "current":
-                # These modes force a clear and stream from the current moment
+            elif mode == "clear":
+                # These modes force a clear
                 since_time = self._get_wsl_current_time()
                 until_time = None
 
@@ -1053,16 +1113,12 @@ class WSLDockerMonitorApp(ttk.Frame):
                     log_text.see(tk.END)
                     return
 
-                log_message = f"--- Display cleared. Streaming from current moment: {since_time} ---"
-
             elif (
                 mode == "timestamp_toggle"
             ):  # ⬅️ This mode should inherit previous filters but NOT clear
                 # Inherit the previous filter settings
                 since_time = log_thread.since_time
                 until_time = log_thread.until_time
-
-                log_message = f"--- Stream format updated. Timestamps are now {'ON' if show_timestamps else 'OFF'} ---"
 
             else:
                 # If we don't clear, insert a separator for clarity
@@ -1098,24 +1154,13 @@ class WSLDockerMonitorApp(ttk.Frame):
             # 5. Update reference and notify user
             # nonlocal log_thread
             log_thread = new_log_thread
-            # Insert separator if we did NOT clear the screen (e.g., in timestamp_toggle mode)
-            if not clear_required:
-                log_text.config(state=tk.NORMAL)
-                log_text.insert(tk.END, "\n-------------------------------------\n")
-
-            # log_text.after(0, log_text.insert, tk.END, log_message + "\n")
-            log_text.after(
-                0, log_text.insert, tk.END, "\n\n======== NEW STREAM STARTED ========\n"
-            )
-            log_text.after(0, log_text.insert, tk.END, log_message + "\n")
-            log_text.see(tk.END)
 
         # Initial log thread setup (must happen after restart_log_stream definition)
         log_thread = LogStreamer(
             container_id,
             log_text,
             lambda instance: self._safe_remove_log_thread(instance),
-            since_time=None,  # Start with full historical logs
+            since_time=self._get_wsl_current_time(),  # Start from current time to avoid overload
             until_time=None,
             show_timestamps=timestamp_var.get(),  # ⬅️ Initial state
         )
@@ -1129,25 +1174,18 @@ class WSLDockerMonitorApp(ttk.Frame):
         # Option 2: All logs from start
         ttk.Button(
             button_frame,
-            text="1. Show All Logs (from Start)",
-            command=lambda: restart_log_stream(mode="start"),
-        ).pack(side=tk.LEFT, padx=5)
-
-        # Option 3: Current WSL time (same as clear_display)
-        ttk.Button(
-            button_frame,
-            text="2. Stream from Now",
-            command=lambda: restart_log_stream(mode="current"),
+            text="Show History",
+            command=lambda: restart_log_stream(mode="history"),
         ).pack(side=tk.LEFT, padx=5)
 
         # General Clear Display Button (using current time, as requested)
         ttk.Button(
             button_frame,
-            text="Clear Display / Restart Stream",
+            text="Clear",
             command=lambda: restart_log_stream(mode="clear"),
         ).pack(side=tk.LEFT, padx=(20, 5))
 
-        ttk.Button(button_frame, text="Close Window", command=log_window.destroy).pack(
+        ttk.Button(button_frame, text="Close", command=log_window.destroy).pack(
             side=tk.LEFT, padx=5
         )
 
