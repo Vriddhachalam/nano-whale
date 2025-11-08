@@ -5,7 +5,10 @@ import threading
 import time
 import tkinter as tk
 from ctypes import windll
+from datetime import date, datetime
 from tkinter import messagebox, scrolledtext, ttk
+
+import tkcalendar as tkc  # Needs: pip install tkcalendar
 
 CREATE_NO_WINDOW = 0x08000000
 # Make the application DPI aware
@@ -20,6 +23,16 @@ DOCKER_CMD_PREFIX = ["wsl", "docker"]
 # --- END CONFIGURATION ---
 
 
+def resource_path(relative_path):
+    """Get absolute path to resource, works for dev and for PyInstaller"""
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
+
+
 class WSLDockerMonitorApp(ttk.Frame):
     """
     A Tkinter application to monitor and manage Docker resources running inside WSL.
@@ -29,7 +42,7 @@ class WSLDockerMonitorApp(ttk.Frame):
     def __init__(self, master=None):
         # Inherit from ttk.Frame and pass the master (main window)
         super().__init__(master)
-        self.master.title("WSL Docker Manager")
+        self.master.title("Nano Whale")
         self.master.geometry("900x700")
         self.master.protocol("WM_DELETE_WINDOW", self.on_close)
         self.pack(fill="both", expand=True)
@@ -780,6 +793,113 @@ class WSLDockerMonitorApp(ttk.Frame):
 
     # --- LOGS IMPLEMENTATION ---
 
+    def _get_wsl_current_time(self):
+        """Fetches the current UTC time from WSL using the required format."""
+        command = ["date", "-u", "+%Y-%m-%dT%H:%M:%S.%NZ"]
+        try:
+            result = subprocess.run(command, capture_output=True, text=True, check=True)
+            return result.stdout.strip()
+        except (subprocess.CalledProcessError, FileNotFoundError) as e:
+            print(f"Error fetching WSL date: {e}")
+            return None
+
+    def _safe_remove_log_thread(self, thread_instance):
+        """Safely removes a thread instance from the active list."""
+        try:
+            if thread_instance in self.active_log_threads:
+                self.active_log_threads.remove(thread_instance)
+        except Exception as e:
+            # Log or print the error, but prevent the program crash
+            print(
+                f"Warning: Failed to safely remove thread {thread_instance.name}: {e}"
+            )
+
+    def _show_datetime_picker(self, master, target_var):
+        """Opens a Toplevel window with a Calendar and time Spinboxes."""
+
+        cal_window = tk.Toplevel(master)
+        cal_window.title("Select Date and Time")
+        cal_window.transient(master)
+
+        # Variables for time
+        hour_var = tk.IntVar(value=datetime.now().hour)
+        minute_var = tk.IntVar(value=datetime.now().minute)
+        second_var = tk.IntVar(value=datetime.now().second)
+
+        # 1. Calendar Widget
+        today = date.today()
+        cal = tkc.Calendar(
+            cal_window,
+            selectmode="day",
+            year=today.year,
+            month=today.month,
+            day=today.day,
+            date_pattern="y-mm-dd",
+        )
+        cal.pack(pady=10, padx=10)
+
+        # 2. Time Input Frame
+        time_frame = ttk.Frame(cal_window)
+        time_frame.pack(pady=5, padx=10)
+
+        # Hour Spinbox
+        ttk.Label(time_frame, text="Time (HH:MM:SS):").pack(side=tk.LEFT)
+        ttk.Spinbox(
+            time_frame,
+            from_=0,
+            to=23,
+            width=3,
+            wrap=True,
+            textvariable=hour_var,
+            format="%02.0f",
+        ).pack(side=tk.LEFT, padx=2)
+        ttk.Label(time_frame, text=":").pack(side=tk.LEFT)
+
+        # Minute Spinbox
+        ttk.Spinbox(
+            time_frame,
+            from_=0,
+            to=59,
+            width=3,
+            wrap=True,
+            textvariable=minute_var,
+            format="%02.0f",
+        ).pack(side=tk.LEFT, padx=2)
+        ttk.Label(time_frame, text=":").pack(side=tk.LEFT)
+
+        # Second Spinbox
+        ttk.Spinbox(
+            time_frame,
+            from_=0,
+            to=59,
+            width=3,
+            wrap=True,
+            textvariable=second_var,
+            format="%02.0f",
+        ).pack(side=tk.LEFT, padx=2)
+
+        def set_datetime():
+            # Get selected date (YYYY-MM-DD)
+            selected_date_str = cal.get_date()
+
+            # Format time with padding and ensure UTC/Zulu 'Z' suffix
+            time_str = (
+                f"{hour_var.get():02d}:"
+                f"{minute_var.get():02d}:"
+                f"{second_var.get():02d}.000000000Z"  # Add nanosecond precision and Z for RFC3339
+            )
+
+            # Combine into RFC3339 format
+            new_timestamp = f"{selected_date_str}T{time_str}"
+
+            target_var.set(new_timestamp)
+            cal_window.destroy()
+
+        ttk.Button(cal_window, text="Set Datetime", command=set_datetime).pack(pady=10)
+        cal_window.grab_set()
+        master.wait_window(cal_window)
+
+    # --- LOGS IMPLEMENTATION ---
     def show_logs(self):
         """Opens a Toplevel window to stream and watch logs for a selected container."""
         container_id = self._get_selected_id(self.containers_tree)
@@ -790,47 +910,250 @@ class WSLDockerMonitorApp(ttk.Frame):
 
         log_window = tk.Toplevel(self)
         log_window.title(f"Logs: {container_name} ({container_id[:12]})")
-        log_window.geometry(view_logs_size)
+        # log_window.iconbitmap("nano_whale.ico")
+        # log_window.geometry(view_logs_size)
 
-        x_cordinate = (screen_width - window_width) // 2
-        y_cordinate = (
-            screen_height - window_height
-        ) // 2  # Center vertically too for a better look
-        log_window.geometry(f"+{x_cordinate}+{y_cordinate}")
+        # Set icon using resource_path
+        try:
+            icon_path = resource_path("nano_whale.ico")
+            log_window.iconbitmap(icon_path)
+        except:
+            pass
 
+        # Calculate window size after window creation
+        log_window.update_idletasks()  # Force window initialization
+        screen_width = log_window.winfo_screenwidth()
+        screen_height = log_window.winfo_screenheight()
+        window_width = screen_width // 2
+        window_height = 800
+        log_window.geometry(f"{window_width}x{window_height}")
+
+        # Control Frame (sits at the top)
+        control_frame = ttk.Frame(log_window)
+        control_frame.pack(fill="x", padx=10, pady=5)
+
+        # Text widget for logs
         log_text = scrolledtext.ScrolledText(
             log_window,
             wrap=tk.WORD,
-            state=tk.DISABLED,
+            state=tk.NORMAL,
             bg="#1e1e1e",
             fg="#ffffff",
             font=("Consolas", 10),
         )
         log_text.pack(expand=True, fill="both", padx=10, pady=10)
 
-        def clear_display():
-            log_text.config(state=tk.NORMAL)
-            log_text.delete("1.0", tk.END)
-            log_text.config(state=tk.DISABLED)
+        # --- Variables and Entry Fields ---
+        from_time_var = tk.StringVar(value="")
+        to_time_var = tk.StringVar(value="")
 
-        button_frame = ttk.Frame(log_window)
-        button_frame.pack(pady=5)
-        ttk.Button(button_frame, text="Clear Display", command=clear_display).pack(
-            side=tk.LEFT, padx=5
-        )
-        ttk.Button(button_frame, text="Close Window", command=log_window.destroy).pack(
-            side=tk.LEFT, padx=5
-        )
+        # ⬅️ NEW: Checkbox Variable, default to True (checked/on)
+        timestamp_var = tk.BooleanVar(value=True)
 
+        # Add a checkbutton command that explicitly doesn't clear the display text
+        ttk.Checkbutton(
+            control_frame,
+            text="Show Timestamps (-t)",
+            variable=timestamp_var,
+            # ⬅️ CHANGE: Use a new mode 'timestamp_toggle' which won't clear the text
+            command=lambda: restart_log_stream(mode="timestamp_toggle"),
+        ).pack(side=tk.LEFT, padx=10)
+
+        # From Entry and Picker
+        ttk.Label(control_frame, text="From (RFC3339):").pack(side=tk.LEFT, padx=5)
+        from_entry = ttk.Entry(control_frame, textvariable=from_time_var, width=25)
+        from_entry.pack(side=tk.LEFT, padx=1)
+        ttk.Button(
+            control_frame,
+            text="📅🕓",  # ⬅️ Updated Button Text
+            # ⬅️ Call the new datetime picker function
+            command=lambda: self._show_datetime_picker(log_window, from_time_var),
+        ).pack(side=tk.LEFT, padx=(0, 1))
+
+        # To Entry and Picker
+        ttk.Label(control_frame, text="To (RFC3339):").pack(side=tk.LEFT, padx=5)
+        to_entry = ttk.Entry(control_frame, textvariable=to_time_var, width=25)
+        to_entry.pack(side=tk.LEFT, padx=1)
+        ttk.Button(
+            control_frame,
+            text="📅🕗",  # ⬅️ Updated Button Text
+            # ⬅️ Call the new datetime picker function
+            command=lambda: self._show_datetime_picker(log_window, to_time_var),
+        ).pack(side=tk.LEFT, padx=(0, 1))
+
+        # Apply Filter Button
+        # Note: Ensure restart_log_stream is defined or accessible here
+        ttk.Button(
+            control_frame,
+            text="Apply Range Filter",
+            command=lambda: restart_log_stream(mode="range"),
+        ).pack(side=tk.LEFT, padx=10)
+
+        def thread_exit_callback(thread_instance):
+            self._safe_remove_log_thread(thread_instance)
+
+        # --- Internal State Management ---
+        # Initial log thread setup (None for full logs)
         log_thread = LogStreamer(
-            container_id, log_text, lambda: self.active_log_threads.remove(log_thread)
+            container_id,
+            log_text,
+            # lambda: self.active_log_threads.remove(log_thread),
+            lambda instance: thread_exit_callback(instance),
+            since_time=None,  # Start with full historical logs
+            until_time=None,
+            show_timestamps=timestamp_var.get(),
         )
         self.active_log_threads.append(log_thread)
         log_thread.start()
 
+        # --- Core Log Stream Management Functions ---
+
+        def restart_log_stream(mode="clear", since_time=None, until_time=None):
+            """Stops the current stream and starts a new one based on the mode."""
+            nonlocal log_thread
+
+            # ⬅️ Capture the current timestamp state from the UI
+            show_timestamps = timestamp_var.get()
+            # 1. Stop the current stream
+            log_thread.terminate()
+
+            clear_required = mode in ("clear", "start", "range")
+
+            if clear_required:
+                log_text.config(state=tk.NORMAL)
+                log_text.delete("1.0", tk.END)  # ⬅️ WIPE SCREEN ONLY HERE
+                log_text.config(state=tk.DISABLED)
+
+            log_message = ""
+
+            if mode == "range":
+                since_time = from_time_var.get() if from_time_var.get() else None
+                until_time = to_time_var.get() if to_time_var.get() else None
+                log_message = f"--- Streaming log range: FROM {since_time or 'START'} TO {until_time or 'NOW'} ---"
+
+            elif mode == "start":
+                since_time = None
+                until_time = None
+                log_message = (
+                    "--- Streaming ALL available logs from container start ---"
+                )
+
+            elif mode == "clear" or mode == "current":
+                # These modes force a clear and stream from the current moment
+                since_time = self._get_wsl_current_time()
+                until_time = None
+
+                if not since_time:
+                    log_text.after(
+                        0,
+                        log_text.insert,
+                        tk.END,
+                        f"--- ERROR: Could not fetch time. Stream failed. ---\n",
+                    )
+                    log_text.see(tk.END)
+                    return
+
+                log_message = f"--- Display cleared. Streaming from current moment: {since_time} ---"
+
+            elif (
+                mode == "timestamp_toggle"
+            ):  # ⬅️ This mode should inherit previous filters but NOT clear
+                # Inherit the previous filter settings
+                since_time = log_thread.since_time
+                until_time = log_thread.until_time
+
+                log_message = f"--- Stream format updated. Timestamps are now {'ON' if show_timestamps else 'OFF'} ---"
+
+            else:
+                # If we don't clear, insert a separator for clarity
+                log_text.after(
+                    0, log_text.insert, tk.END, "\n--- Stream format updated ---\n"
+                )
+                log_text.see(tk.END)
+
+            # 3. Create and start the new thread
+            new_log_thread = LogStreamer(
+                container_id,
+                log_text,
+                # lambda: self.active_log_threads.remove(new_log_thread),
+                lambda instance: thread_exit_callback(
+                    new_log_thread
+                ),  # ⬅️ Use the safe callback
+                since_time=since_time,
+                until_time=until_time,  # Pass new until_time to LogStreamer
+                # ⬅️ PASS THE TIMESTAMP STATE
+                show_timestamps=show_timestamps,
+            )
+
+            # 4. Update tracking and bindings
+            try:
+                self.active_log_threads.remove(log_thread)
+            except ValueError:
+                self._safe_remove_log_thread(log_thread)
+
+            self.active_log_threads.append(new_log_thread)
+            log_window.bind("<Destroy>", lambda e: new_log_thread.terminate())
+            new_log_thread.start()
+
+            # 5. Update reference and notify user
+            # nonlocal log_thread
+            log_thread = new_log_thread
+            # Insert separator if we did NOT clear the screen (e.g., in timestamp_toggle mode)
+            if not clear_required:
+                log_text.config(state=tk.NORMAL)
+                log_text.insert(tk.END, "\n-------------------------------------\n")
+
+            # log_text.after(0, log_text.insert, tk.END, log_message + "\n")
+            log_text.after(
+                0, log_text.insert, tk.END, "\n\n======== NEW STREAM STARTED ========\n"
+            )
+            log_text.after(0, log_text.insert, tk.END, log_message + "\n")
+            log_text.see(tk.END)
+
+        # Initial log thread setup (must happen after restart_log_stream definition)
+        log_thread = LogStreamer(
+            container_id,
+            log_text,
+            lambda instance: self._safe_remove_log_thread(instance),
+            since_time=None,  # Start with full historical logs
+            until_time=None,
+            show_timestamps=timestamp_var.get(),  # ⬅️ Initial state
+        )
+        self.active_log_threads.append(log_thread)
+        log_thread.start()
+
+        # --- Bottom Button Frame ---
+        button_frame = ttk.Frame(log_window)
+        button_frame.pack(pady=5)
+
+        # Option 2: All logs from start
+        ttk.Button(
+            button_frame,
+            text="1. Show All Logs (from Start)",
+            command=lambda: restart_log_stream(mode="start"),
+        ).pack(side=tk.LEFT, padx=5)
+
+        # Option 3: Current WSL time (same as clear_display)
+        ttk.Button(
+            button_frame,
+            text="2. Stream from Now",
+            command=lambda: restart_log_stream(mode="current"),
+        ).pack(side=tk.LEFT, padx=5)
+
+        # General Clear Display Button (using current time, as requested)
+        ttk.Button(
+            button_frame,
+            text="Clear Display / Restart Stream",
+            command=lambda: restart_log_stream(mode="clear"),
+        ).pack(side=tk.LEFT, padx=(20, 5))
+
+        ttk.Button(button_frame, text="Close Window", command=log_window.destroy).pack(
+            side=tk.LEFT, padx=5
+        )
+
         log_window.bind(
             "<Destroy>",
-            lambda e: log_thread.log_process and log_thread.log_process.terminate(),
+            lambda e: log_thread.terminate(),
         )
 
 
@@ -840,16 +1163,48 @@ class WSLDockerMonitorApp(ttk.Frame):
 class LogStreamer(threading.Thread):
     """A thread to stream Docker logs using subprocess.Popen."""
 
-    def __init__(self, container_id, text_widget, on_exit_callback):
+    def __init__(
+        self,
+        container_id,
+        text_widget,
+        on_exit_callback,
+        since_time=None,
+        until_time=None,
+        show_timestamps=True,
+    ):
         super().__init__()
         self.container_id = container_id
         self.text_widget = text_widget
         self.on_exit_callback = on_exit_callback
+        self.since_time = since_time
+        self.until_time = until_time
+        self.show_timestamps = show_timestamps  # ⬅️ NEW: Store timestamp state
         self.log_process = None
         self.daemon = True
+        self.running = True
 
     def run(self):
-        command = DOCKER_CMD_PREFIX + ["logs", "-f", self.container_id]
+        command = DOCKER_CMD_PREFIX + ["logs"]
+
+        # ⬅️ ADD -t FLAG CONDITIONALLY
+        if self.show_timestamps:
+            command.append("-t")
+
+        # Only use -f (follow) if we are streaming indefinitely (no until filter)
+        if not self.until_time:
+            command.append("-f")
+
+        if self.since_time:
+            command.append(f"--since={self.since_time}")
+
+        if self.until_time:
+            command.append(f"--until={self.until_time}")  # ⬅️ New: Add --until
+
+        command.append(self.container_id)
+
+        # Example command (Range): ["docker", "logs", "--since=T1", "--until=T2", "id"]
+        # Example command (Follow): ["docker", "logs", "-f", "id"]
+
         try:
             self.log_process = subprocess.Popen(
                 command,
@@ -862,30 +1217,39 @@ class LogStreamer(threading.Thread):
             )
 
             for line in iter(self.log_process.stdout.readline, ""):
-                if not self.log_process or self.log_process.poll() is not None:
+                if not self.running or self.log_process.poll() is not None:
                     break
-
                 self.text_widget.after(0, self.append_text, line)
 
-            if self.log_process.stdout:
-                self.log_process.stdout.close()
-            self.log_process.wait()
+            # If the log process stops naturally (i.e., when using --until)
+            if self.log_process.wait() == 0 and self.until_time:
+                self.text_widget.after(
+                    0,
+                    self.append_text,
+                    f"\n--- Log stream finished at {self.until_time}. No more logs. ---\n",
+                )
 
         except Exception as e:
             self.text_widget.after(
                 0, self.append_text, f"\n--- ERROR: Log Streamer failed: {e} ---\n"
             )
         finally:
+            self.running = False
             if self.log_process and self.log_process.poll() is None:
                 self.log_process.terminate()
-            self.on_exit_callback()
+            self.on_exit_callback(self)
 
+    # append_text and terminate methods remain the same
     def append_text(self, content):
-        """Inserts text into the Text widget and scrolls to the end."""
         self.text_widget.config(state=tk.NORMAL)
         self.text_widget.insert(tk.END, content)
         self.text_widget.see(tk.END)
         self.text_widget.config(state=tk.DISABLED)
+
+    def terminate(self):
+        self.running = False
+        if self.log_process and self.log_process.poll() is None:
+            self.log_process.terminate()
 
 
 if __name__ == "__main__":
@@ -917,6 +1281,10 @@ if __name__ == "__main__":
 
     # Set theme for modern look
     style = ttk.Style()
+    # root.iconbitmap("./nano_whale.ico")
+    icon_path = resource_path("nano_whale.ico")
+    root.iconbitmap(icon_path)
+
     try:
         style.theme_use("vista")  # Windows default
     except:
