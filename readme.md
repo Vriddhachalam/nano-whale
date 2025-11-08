@@ -62,7 +62,9 @@ Here’s the quick-and-dirty method:
 
 ## 📥 Installation (The Smooth Way)
 
+
 * Grab the latest **Nano_Whale.exe** from [HERE](https://drive.google.com/file/d/1pyhzu2eGVdBTSLz0R9oAKkdkqAcgR5fy/view?usp=sharing).
+
 
 * Run the executable **as Administrator (this is important!)**. Right-click and select **Run as administrator**. This is needed for the initial setup of WSL and the Docker Engine.
 
