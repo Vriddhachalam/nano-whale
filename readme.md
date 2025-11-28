@@ -107,28 +107,6 @@ Tired of Docker Desktop's resource consumption? Nano Whale gives you:
 
 ---
 
-## 🚀 Get Whale-ing: The Setup
-
-### ⚠️ First Rule of Nano Whale Club: Uninstall Docker Desktop
-
-Nano Whale is the future, which means we need to clear out the past! For a conflict-free and resource-optimized environment, you must first uninstall any existing installation of Docker Desktop.
-
-Here's the quick-and-dirty method:
-
-* Open Windows **Settings**.
-* Head to **Apps** (or **Installed Apps**).
-* Find and click **Docker Desktop**.
-* Hit that **Uninstall** button!
-
-Before installing, we need to make sure your environment is spotless! To prevent any configuration conflicts, it is **highly recommended** that you **wipe your existing WSL distribution** using the method shown in the images. This blasts away any sneaky Docker Desktop files or configs that could cause a clash with the ultra-clean Nano Whale!
-
-<p align="center">
-  <img src="./img/wsl_del_1.png" alt="WSL Delete Step 1" >
-</p>
-<p align="center">
-  <img src="./img/wsl_del_2.png" alt="WSL Delete Step 2" >
-</p>
-
 ### Quick WSL2 & Docker Setup
 
 If you don't have WSL2 and Docker Engine set up:
