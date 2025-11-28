@@ -1,2 +1,2 @@
-pyinstaller==6.16.0
-tkcalendar==1.6.1
+textual==6.2.0
+nuitka

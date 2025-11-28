@@ -1,5 +1,9 @@
 /.venv/
+/.lx_venv/
 /__pycache__/
+/main.build/
+/main.dist/
+/*.exe
 /build/
 /dist/
 *.spec
