@@ -5,3 +5,5 @@
 *.spec
 decent_readme.md
 logo_full.png
+*.exe
+main.dist
