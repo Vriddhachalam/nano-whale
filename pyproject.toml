@@ -38,7 +38,7 @@ dependencies = [
 Homepage = "https://github.com/Vriddhachalam/nano-whale.git"
 Repository = "https://github.com/Vriddhachalam/nano-whale.git"
 Issues = "https://github.com/Vriddhachalam/nano-whale/issues"
-Documentation = "https://github.com/Vriddhachalam/nano-whale/blob/main/README.md"
+Documentation = "https://github.com/Vriddhachalam/nano-whale/blob/master/README.md"
 
 [project.scripts]
 nano-whale = "nano_whale.main:main"
