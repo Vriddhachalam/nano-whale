@@ -4,7 +4,7 @@
 [![Textual](https://img.shields.io/badge/built%20with-Textual-cyan.svg)](https://textual.textualize.io/)
 
 <p align="center">
-  <img src="img/nano_whale_w_bg.png" alt="Nano Whale logo" >
+  <img src="/img/nano_whale_w_bg.png" alt="Nano Whale logo" >
 </p>
 
 > ⚠️ **DEPRECATION NOTICE**: The original Tkinter GUI version of Nano Whale has been deprecated. This repository now contains the new and improved **Terminal User Interface (TUI)** version built with Textual. For the legacy version, see the `legacy-tkinter` branch.
@@ -27,17 +27,17 @@ Meet **Nano Whale TUI**! A blazingly fast, lightweight **Terminal User Interface
 
 ### Main Interface
 <p align="center">
-  <img src="img/main.png" alt="Nano Whale TUI - Main Interface" width="900">
+  <img src="/img/main.png" alt="Nano Whale TUI - Main Interface" width="900">
 </p>
 
 ### Multi-Select Mode
 <p align="center">
-  <img src="img/multi_select.png" alt="Nano Whale TUI - Multi-Select" width="900">
+  <img src="/img/multi_select.png" alt="Nano Whale TUI - Multi-Select" width="900">
 </p>
 
 ### Commands Panel
 <p align="center">
-  <img src="img/commands_panel.png" alt="Nano Whale TUI - Commands Panel" width="900">
+  <img src="/img/commands_panel.png" alt="Nano Whale TUI - Commands Panel" width="900">
 </p>
 
 ---
@@ -174,11 +174,11 @@ python nano_whale/main.py
 3. Press `Ctrl+C` or `Ctrl+D` to return to TUI
 
 <p align="center">
-  <img src="img/in_shell_logs.png" alt="Nano Whale TUI - In-Shell Logs" width="900">
+  <img src="/img/in_shell_logs.png" alt="Nano Whale TUI - In-Shell Logs" width="900">
 </p>
 
 <p align="center">
-  <img src="img/in_shell_exec_terminal.png" alt="Nano Whale TUI - In-Shell Exec Terminal" width="900">
+  <img src="/img/in_shell_exec_terminal.png" alt="Nano Whale TUI - In-Shell Exec Terminal" width="900">
 </p>
 
 
@@ -187,11 +187,11 @@ python nano_whale/main.py
 2. Press `Ctrl+L` or `Ctrl+T`
 
 <p align="center">
-  <img src="img/new_shell_logs.png" alt="Nano Whale TUI - New Shell Logs" width="900">
+  <img src="/img/new_shell_logs.png" alt="Nano Whale TUI - New Shell Logs" width="900">
 </p>
 
 <p align="center">
-  <img src="img/new_shell_terminal.png" alt="Nano Whale TUI - New Shell Terminal" width="900">
+  <img src="/img/new_shell_terminal.png" alt="Nano Whale TUI - New Shell Terminal" width="900">
 </p>
 
 
@@ -306,16 +306,16 @@ The legacy Tkinter version can still be found in the `legacy-tkinter` branch, bu
 ### Legacy Version Screenshots (Deprecated)
 
 <p align="center">
-  <img src="img/face.png" alt="Legacy GUI - Main" width="738">
+  <img src="/img/face.png" alt="Legacy GUI - Main" width="738">
 </p>
 <p align="center">
-  <img src="img/images.png" alt="Legacy GUI - Images" width="738">
+  <img src="/img/images.png" alt="Legacy GUI - Images" width="738">
 </p>
 <p align="center">
-  <img src="img/logs.png" alt="Legacy GUI - Logs" width="738">
+  <img src="/img/logs.png" alt="Legacy GUI - Logs" width="738">
 </p>
 <p align="center">
-  <img src="img/terminal.png" alt="Legacy GUI - Terminal" width="738">
+  <img src="/img/terminal.png" alt="Legacy GUI - Terminal" width="738">
 </p>
 
 ---
