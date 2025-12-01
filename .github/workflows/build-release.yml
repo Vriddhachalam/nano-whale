@@ -6,11 +6,35 @@ on:
     types: [published]
 
 jobs:
+  # ----------------------------------------
+  # Job 1: Create manual release (only once)
+  # ----------------------------------------
+  create_release:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    outputs:
+      upload_url: ${{ steps.manual_release.outputs.upload_url }}
+    steps:
+      - name: Create manual release
+        id: manual_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.REPO_TOKEN }}
+        with:
+          tag_name: manual-${{ github.run_id }}
+          release_name: Manual Build - ${{ github.run_id }}
+          body: Automatic manual build generated from workflow_dispatch.
+          draft: false
+          prerelease: true
+
+  # ----------------------------------------
+  # Job 2: Build binaries for all OSes
+  # ----------------------------------------
   build:
+    needs: create_release   # ensures release exists before uploading
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -29,39 +53,23 @@ jobs:
         run: |
           nuitka --onefile --follow-imports nano_whale/main.py --output-filename=nano-whale
 
-      # --------------------------------------------------------------------
-      # MANUAL RUN: Create a fake release
-      # --------------------------------------------------------------------
-      - name: Create manual release
-        if: github.event_name == 'workflow_dispatch'
-        id: manual_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.REPO_TOKEN }}
-        with:
-          tag_name: manual-${{ github.run_id }}
-          release_name: Manual Build - ${{ github.run_id }}
-          body: "Automatic manual build generated from workflow_dispatch."
-          draft: false
-          prerelease: true
-
-      # --------------------------------------------------------------------
-      # MANUAL RUN: Upload asset to the manual release
-      # --------------------------------------------------------------------
+      # -------------------------------------------------------
+      # Upload to manual release (workflow_dispatch)
+      # -------------------------------------------------------
       - name: Upload asset to manual release
         if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.REPO_TOKEN }}
         with:
-          upload_url: ${{ steps.manual_release.outputs.upload_url }}
+          upload_url: ${{ needs.create_release.outputs.upload_url }}
           asset_path: ./nano-whale${{ matrix.os == 'windows-latest' && '.exe' || '' }}
           asset_name: nano-whale-${{ matrix.os }}-manual${{ matrix.os == 'windows-latest' && '.exe' || '' }}
           asset_content_type: application/octet-stream
 
-      # --------------------------------------------------------------------
-      # REAL RELEASE: Upload to official release
-      # --------------------------------------------------------------------
+      # -------------------------------------------------------
+      # Upload to real release (release published)
+      # -------------------------------------------------------
       - name: Upload Release Asset (real release)
         if: github.event_name == 'release'
         uses: actions/upload-release-asset@v1
