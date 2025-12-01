@@ -10,3 +10,4 @@
 *.spec
 decent_readme.md
 logo_full.png
+/node_modules/
