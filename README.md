@@ -158,7 +158,7 @@ nano-whale
 Or run directly:
 
 ```bash
-python main.py
+python nano_whale/main.py
 ```
 
 ---
@@ -348,7 +348,7 @@ pip install -r requirements.txt
 pip install -e .
 
 # Run from source
-python main.py
+python nano_whale/main.py
 ```
 
 ### 📦 Building Portable Executable with Nuitka
@@ -364,10 +364,10 @@ Want to create a standalone `.exe` that doesn't require Python installed? Use [N
 
 ```bash
 # Windows - Build standalone exe
-python -m nuitka --standalone --onefile --enable-plugin=tk-inter --windows-console-mode=force --output-filename=nano-whale.exe main.py
+python -m nuitka --standalone --onefile --enable-plugin=tk-inter --windows-console-mode=force --output-filename=nano-whale.exe nano_whale/main.py
 
 # Linux/macOS - Build standalone binary
-python -m nuitka --standalone --onefile --output-filename=nano-whale main.py
+python -m nuitka --standalone --onefile --output-filename=nano-whale nano_whale/main.py
 ```
 
 **Build Options Explained:**
@@ -443,7 +443,7 @@ source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -e .
 
 # Run
-python main.py
+python nano_whale/main.py
 ```
 
 ---
