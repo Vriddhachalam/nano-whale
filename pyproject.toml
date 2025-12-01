@@ -1,0 +1,47 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "nano-whale"
+version = "0.1.16"
+description = "A lightweight Terminal User Interface (TUI) for managing Docker containers, images, and volumes via WSL2"
+readme = "README.md"
+authors = [
+    { name = "Vriddhachalam S", email = "svriddhachalam@gmail.com" }
+]
+license = { file = "LICENSE" }
+requires-python = ">=3.8"
+keywords = ["docker", "tui", "wsl2", "terminal", "containers", "cli", "textual"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: System :: Monitoring",
+    "Topic :: System :: Systems Administration",
+    "Topic :: Utilities",
+]
+dependencies = [
+    "textual>=0.40.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/Vriddhachalam/nano-whale.git"
+Repository = "https://github.com/Vriddhachalam/nano-whale.git"
+Issues = "https://github.com/Vriddhachalam/nano-whale/issues"
+Documentation = "https://github.com/Vriddhachalam/nano-whale/blob/main/README.md"
+
+[project.scripts]
+nano-whale = "nano_whale.main:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["nano_whale"]

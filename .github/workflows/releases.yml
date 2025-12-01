@@ -1,0 +1,32 @@
+name: Auto Tag & Build Release
+
+on:
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        run: pip install tomli
+
+      - name: Get version from pyproject
+        id: get_version
+        run: echo "version=$(python scripts/get_version.py)" >> $GITHUB_OUTPUT
+
+      - name: Create Git Tag
+        uses: mathieudutour/github-tag-action@v6.2
+        with:
+          github_token: ${{ secrets.REPO_TOKEN }}
+          custom_tag: v${{ steps.get_version.outputs.version }}
+          tag_prefix: ""
