@@ -52,7 +52,7 @@ jobs:
       - name: Build executable
         run: |
           if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-            python -m nuitka --onefile --follow-imports nano_whale/main.py --output-filename=nano-whale.exe --windows-dependency-tool=auto
+            python -m nuitka --standalone --onefile --assume-yes-for-downloads nano_whale/main.py --output-filename=nano-whale
           else
             nuitka --onefile --follow-imports nano_whale/main.py --output-filename=nano-whale
           fi
