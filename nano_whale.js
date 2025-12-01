@@ -41,13 +41,15 @@ let logsContent = "";
 let logsAutoScroll = true;
 let currentTab = 0; // 0=Logs, 1=Stats, 2=Env, 3=Config, 4=Top
 const tabNames = ["Logs", "Stats", "Env", "Config", "Top"];
+let helpBarButtonsMap = []; // Stores clickable areas and their associated handler function
 
 // Create screen
 const screen = blessed.screen({
   smartCSR: true,
-  title: "Docker TUI",
+  title: "nano-whale",
   fullUnicode: true,
   fastCSR: true,
+  mouse: true, // Enable mouse support
 });
 
 // ==================== LEFT PANELS ====================
@@ -170,10 +172,47 @@ const tabHeader = blessed.box({
     border: { fg: "white" },
   },
   tags: true,
+  mouse: true, // Enable mouse for tabHeader
+});
+ 
+tabHeader.on('click', async (data) => {
+    const clickXInContent = data.x - tabHeader.aleft;
+
+    let currentTabXOffset = 1; // Start at 1 because 0 is the left border (invisible but present in blessed coordinates)
+
+    for (let i = 0; i < tabNames.length; i++) {
+        const tabName = tabNames[i];
+        // Visible width of the tab name itself, including the two padding spaces
+        const tabContentWidth = tabName.length + 2;
+
+        // Determine the width of the separator following this tab, if any
+        let separatorWidth = 0;
+        if (i < tabNames.length - 1) {
+            separatorWidth = 1; // For the single hyphen character
+        }
+
+        // The total width of this tab segment, including its content and its separator
+        const totalSegmentClickableWidth = tabContentWidth + separatorWidth;
+        const tabMinX = currentTabXOffset;
+        const tabMaxX = currentTabXOffset + totalSegmentClickableWidth - 1; // Max X is inclusive
+
+        // Check if the click occurred within the bounds of this tab segment
+        if (clickXInContent >= tabMinX && clickXInContent <= tabMaxX) {
+            if (currentTab !== i) {
+                currentTab = i;
+                updateTabHeader();
+                await updateCurrentTab();
+                screen.render();
+            }
+            return; // Found the clicked tab, exit function
+        }
+        // Advance the offset for the next tab segment
+        currentTabXOffset += totalSegmentClickableWidth;
+    }
 });
 
-// Main content area (right side)
-const contentBox = blessed.box({
+ // Main content area (right side)
+ const contentBox = blessed.box({
   top: 3,
   left: "40%",
   width: "60%",
@@ -206,6 +245,7 @@ const helpBar = blessed.box({
     fg: "white",
     bg: "blue",
   },
+  mouse: true, // Enable mouse for helpBar
 });
 
 // Append all elements
@@ -217,6 +257,26 @@ screen.append(networksBox);
 screen.append(tabHeader);
 screen.append(contentBox);
 screen.append(helpBar);
+
+helpBar.on('click', async (data) => {
+  const clickXInHelpBar = data.x - helpBar.aleft;
+
+  for (const button of helpBarButtonsMap) {
+    if (button.handler && clickXInHelpBar >= button.minX && clickXInHelpBar <= button.maxX) {
+      // Debug for mouse 't' and 'C-t'
+      if (button.key === 't') {
+        showNotification(`HelpBar: Mouse 't' (Exec) handler triggered! Click: ${clickXInHelpBar}`, "magenta");
+      } else if (button.key === 'C-t') {
+        showNotification(`HelpBar: Mouse 'C-t' (NewExec) handler triggered! Click: ${clickXInHelpBar}`, "magenta");
+      } else {
+        showNotification(`HelpBar: Executing action for '${button.display}' (Click: ${clickXInHelpBar})`, "green");
+      }
+      await button.handler(); // Execute the handler function directly
+      return;
+    }
+  }
+  showNotification(`HelpBar: No action found for click at ${clickXInHelpBar}`, "yellow");
+});
 
 function reselectByName(list, dataArray, selectedName) {
   if (!selectedName) return 0;
@@ -237,13 +297,7 @@ function updateListStable(list, items, prevIndex = 0) {
   return newIndex;
 }
 /* ---------- Helper: only act if containers list is focused ---------- */
-function withFocusedContainer(fn) {
-  return () => {
-    if (screen.focused !== containersBox) return; // ignore if not in containers
-    const c = dataCache.containers[selectedContainerIndex];
-    if (c) fn(c);
-  };
-}
+
 // ==================== TAB HEADER ====================
 
 function updateTabHeader() {
@@ -261,24 +315,141 @@ function updateTabHeader() {
   tabHeader.setContent(header);
 }
 
+// Utility to strip blessed tags for calculating visible string length
+function stripBlessedTags(text) {
+  // Remove blessed tags like {bold}, {/}, {fg-color}
+  return text.replace(/\{[^\}]+\}/g, "");
+}
+
 function updateHelpBar() {
-  const container = dataCache.containers[selectedContainerIndex];
-  const isRunning = container && container.state === "running";
+  helpBarButtonsMap = []; // Reset the map on each update
+  let helpString = "";
+  let currentDisplayOffset = 0; // Tracks the visible character offset in the rendered help bar
 
-  let help = " {bold}q{/}:Quit {bold}←→{/}:Tabs {bold}↑↓{/}:Nav ";
-
-  if (container) {
-    if (isRunning) {
-      help += "{bold}s{/}:Stop {bold}r{/}:Restart {bold}e{/}:Exec ";
-    } else {
-      help += "{bold}s{/}:Start ";
+  // Helper function to append a segment to the help bar
+  // If `handler` is provided, it\'s considered a clickable action.
+  const appendSegment = (displayString, handler = null, keyForNotification = null) => {
+    // Add a space separator if it\'s not the very first segment
+    if (helpString.length > 0) {
+      helpString += " ";
+      currentDisplayOffset += 1;
     }
-    help += "{bold}d{/}:Delete ";
-  }
 
-  help += "{bold}l{/}:FullLogs {bold}a{/}:AutoScroll {bold}R{/}:Refresh";
+    const visibleLength = stripBlessedTags(displayString).length;
 
-  helpBar.setContent(help);
+    const buttonInfo = {
+      handler: handler,
+      key: keyForNotification, // Keep key for potential notifications/debugging
+      minX: currentDisplayOffset,
+      maxX: currentDisplayOffset + visibleLength - 1, // maxX is inclusive
+      display: stripBlessedTags(displayString), // Store stripped display for debug
+    };
+
+    if (handler) { // Push to map only if there's a handler
+      helpBarButtonsMap.push(buttonInfo);
+    }
+
+    helpString += displayString;
+    currentDisplayOffset += visibleLength;
+  };
+
+  // --- Always visible global actions ---
+  appendSegment("{bold}q{/}:Quit", () => { cleanup(); process.exit(0); }, "q");
+  appendSegment("{bold}←→{/}:Tabs"); // Informational, not directly clickable via single key
+  appendSegment("{bold}↑↓{/}:Nav");   // Informational, not directly clickable via single key
+
+  // --- Container Specific Actions (always displayed, action logic will handle context) ---
+  // Start/Stop/Restart/Exec/Delete Container
+  // Logic for these will now be inside the handler directly
+  const getSelectedContainer = () => dataCache.containers[selectedContainerIndex];
+
+  appendSegment("{bold}s{/}:S/Stop", () => {
+    const c = getSelectedContainer();
+    if (!c) { showNotification("No container selected.", "red"); return; }
+    if (c.state === "running") { showNotification(`Executing stopContainer for ${c.name}`, "blue"); stopContainer(c.name); } else { showNotification(`Executing startContainer for ${c.name}`, "blue"); startContainer(c.name); }
+  }, "s");
+
+  appendSegment("{bold}r{/}:Restart", () => {
+    const c = getSelectedContainer();
+    if (!c) { showNotification("No container selected.", "red"); return; }
+    if (c.state === "running") { showNotification(`Executing restartContainer for ${c.name}`, "blue"); restartContainer(c.name); }
+  }, "r");
+
+  appendSegment("{bold}t{/}:Exec", () => {
+    const c = getSelectedContainer();
+    if (!c) { showNotification("No container selected.", "red"); return; }
+    showNotification(`Executing execIntoContainer for ${c.name} via mouse 't'`, "blue");
+    execIntoContainer(c.name);
+  }, "t");
+
+  appendSegment("{bold}d{/}:DelCon", () => {
+    const c = getSelectedContainer();
+    if (!c) { showNotification("No container selected.", "red"); return; }
+    showNotification(`Confirming delete for container ${c.name}`, "blue");
+    confirmDelete(`Delete container ${c.name}?`, () => deleteContainer(c.name));
+  }, "d");
+
+
+  // --- Image/Volume/Network Delete Actions ---
+  // These keys were overloaded, so we give them unique visual labels and handlers
+  appendSegment("{bold}D:Img{/}", () => { // Changed key to 'D' for delete image clarity
+    const img = dataCache.images[selectedImageIndex];
+    if (!img) { showNotification("No image selected.", "red"); return; }
+    confirmDelete(`Delete image ${img.repo}:${img.tag}?`, () => deleteImage(img.id));
+  }, "D"); // Using 'D' as a logical key for notification/debug
+
+  appendSegment("{bold}D:Vol{/}", () => { // Changed key to 'V' for delete volume clarity
+    const vol = dataCache.volumes[selectedVolumeIndex];
+    if (!vol) { showNotification("No volume selected.", "red"); return; }
+    confirmDelete(`Delete volume ${vol.name}?`, () => deleteVolume(vol.name));
+  }, "V"); // Using 'V' as a logical key for notification/debug
+
+  appendSegment("{bold}D:Net{/}", () => { // Changed key to 'N' for delete network clarity
+    const net = dataCache.networks[selectedNetworkIndex];
+    if (!net) { showNotification("No network selected.", "red"); return; }
+    confirmDelete(`Delete network ${net.name}?`, () => deleteNetwork(net.name));
+  }, "N"); // Using 'N' as a logical key for notification/debug
+
+
+  // --- Special Terminal Spawning Actions ---
+  appendSegment("{bold}C-t{/}:NewExec", () => {
+    const c = getSelectedContainer();
+    if (!c) { showNotification("No container selected for new exec (mouse).", "red"); return; }
+    const cmd = `${dockerCmd} exec -it ${c.name} sh -c "exec /bin/bash || exec /bin/sh"`;
+    showNotification(`Executing spawnNewWindow for NewExec (mouse). Command: ${cmd}`, "blue");
+    spawnNewWindow(cmd, `exec-${c.name}`);
+  }, "C-t");
+
+  appendSegment("{bold}C-l{/}:NewLogs", () => {
+    const c = getSelectedContainer();
+    if (!c) { showNotification("No container selected for new logs (mouse).", "red"); return; }
+    const cmd = `${dockerCmd} logs -f ${c.name}`;
+    showNotification(`Executing spawnNewWindow for NewLogs (mouse). Command: ${cmd}`, "blue");
+    spawnNewWindow(cmd, `logs-${c.name}`);
+  }, "C-l");
+
+  // --- Common actions related to main content ---
+  appendSegment("{bold}l{/}:Logs", async () => { // Switches to Logs tab
+    const c = getSelectedContainer();
+    if (!c) { showNotification("No container selected to show logs.", "red"); return; }
+    currentTab = 0;
+    updateTabHeader();
+    showContainerLogs(c.name, "all");
+    screen.render();
+  }, "l");
+
+  appendSegment("{bold}a{/}:AutoScroll", () => {
+    logsAutoScroll = !logsAutoScroll;
+    showNotification(`Auto-scroll: ${logsAutoScroll ? "ON" : "OFF"}`, logsAutoScroll ? "green" : "yellow");
+  }, "a");
+
+  appendSegment("{bold}R{/}:Refresh", async () => {
+    await updateAll();
+    showNotification("Refreshed data!", "green");
+  }, "S-r");
+
+  helpBar.setContent(helpString);
+  screen.render(); // Ensure the help bar is updated on screen
 }
 
 // ==================== DOCKER COMMANDS ====================
@@ -797,8 +968,10 @@ function stopLogStream() {
 // ==================== EXEC (Fixed for non-TTY) ====================
 
 function execIntoContainer(containerName) {
-  if (!containerName) return;
-
+  if (!containerName) {
+    showNotification("execIntoContainer: No container name provided.", "red");
+    return;
+  }
   const container = dataCache.containers.find((c) => c.name === containerName);
   if (!container || container.state !== "running") {
     showNotification("Container must be running to exec", "red");
@@ -806,7 +979,7 @@ function execIntoContainer(containerName) {
   }
 
   // Use a simpler approach - open external terminal
-  showNotification("Opening terminal... (use external window)", "cyan");
+  showNotification(`Opening terminal for exec into ${containerName}...`, "cyan");
 
   // For Windows with WSL
   if (isWindows) {
@@ -818,21 +991,27 @@ function execIntoContainer(containerName) {
     });
   } else {
     // For Linux/Mac - try to open in new terminal
+    const execCommand = `docker exec -it ${containerName} sh -c "if [ -x /bin/bash ]; then exec /bin/bash; else exec /bin/sh; fi"`;
     const terminals = [
-      `x-terminal-emulator -e docker exec -it ${containerName} sh`,
-      `gnome-terminal -- docker exec -it ${containerName} sh`,
-      `xterm -e docker exec -it ${containerName} sh`,
-      `konsole -e docker exec -it ${containerName} sh`,
+      `x-terminal-emulator -e ${execCommand}`,
+      `gnome-terminal -- ${execCommand}`,
+      `xterm -e ${execCommand}`,
+      `konsole -e ${execCommand}`,
     ];
 
     let opened = false;
     for (const termCmd of terminals) {
       try {
-        exec(termCmd, (error) => {
-          if (!error) opened = true;
-        });
-        if (opened) break;
+        const parts = termCmd.split(" ");
+        const command = parts[0];
+        const args = parts.slice(1);
+        showNotification(`ExecIntoContainer spawning: Command=${command}, Args=${JSON.stringify(args)}`, "magenta");
+        spawn(command, args, { detached: true, stdio: "ignore" });
+        opened = true; // If spawn doesn\'t throw, assume it opened successfully
+        break; // Exit the loop after the first successful spawn
       } catch (e) {
+        showNotification(`ExecIntoContainer spawn failed for ${command}: ${e.message}`, "red");
+        // Continue to the next terminal if this one fails
         continue;
       }
     }
@@ -1352,38 +1531,43 @@ screen.key(["5"], () => {
       Open a new terminal window / tab
       ========================================================= */
 function spawnNewWindow(cmd, label) {
+  showNotification(`spawnNewWindow called for '${label}'. Command: '${cmd}'`, "magenta");
   const plat = os.platform();
 
   /* ---------- Windows ---------- */
   if (plat === "win32") {
-    // 1. Try Windows Terminal (wt.exe)
     try {
       execSync("where wt", { stdio: "ignore" });
-      exec(`wt new-tab --title "${label}" cmd /k ${cmd}`);
+      exec(`wt new-tab --title "${label}" cmd /k ${cmd}`, (error) => {
+        if (error) showNotification(`wt.exe failed: ${error.message}`, "red");
+      });
+      showNotification(`Opened new tab in Windows Terminal for '${label}'.`, "green");
       return;
-    } catch (e) {
-      /* ignore */
-    }
+    } catch (e) { /* ignore */ }
 
-    // 2. Try Git-Bash’s mintty
-    const bashPath =
-      process.env.SHELL || "C:\\Program Files\\Git\\bin\\bash.exe";
+    const bashPath = process.env.SHELL || "C:\\Program Files\\Git\\bin\\bash.exe";
     try {
       execSync("where mintty", { stdio: "ignore" });
-      exec(`mintty -t "${label}" -e ${bashPath} -c "${cmd}"`);
+      exec(`mintty -t "${label}" -e ${bashPath} -c "${cmd}"`, (error) => {
+        if (error) showNotification(`mintty failed: ${error.message}`, "red");
+      });
+      showNotification(`Opened new tab in mintty (Git Bash) for '${label}'.`, "green");
       return;
-    } catch (e) {
-      /* ignore */
-    }
+    } catch (e) { /* ignore */ }
 
-    // 3. Fallback to regular cmd
-    exec(`start cmd /k ${cmd}`);
+    exec(`start cmd /k ${cmd}`, (error) => {
+      if (error) showNotification(`cmd.exe failed: ${error.message}`, "red");
+    });
+    showNotification(`Opened new cmd window for '${label}'.`, "green");
     return;
   }
 
   /* ---------- macOS ---------- */
   if (plat === "darwin") {
-    exec(`osascript -e 'tell application "Terminal" to do script "${cmd}"'`);
+    exec(`osascript -e 'tell application "Terminal" to do script "${cmd}"'`, (error) => {
+      if (error) showNotification(`osascript failed: ${error.message}`, "red");
+    });
+    showNotification(`Opened new macOS Terminal window for '${label}'.`, "green");
     return;
   }
 
@@ -1403,7 +1587,15 @@ function spawnNewWindow(cmd, label) {
     }
   });
   if (term) {
-    exec(term);
+    const parts = term.split(" ");
+    const command = parts[0];
+    const args = parts.slice(1);
+    try {
+      spawn(command, args, { detached: true, stdio: "ignore" });
+      showNotification(`Spawned new terminal using '${command}' for '${label}'.`, "green");
+    } catch (e) {
+      showNotification(`Failed to spawn new terminal with '${command}': ${e.message}`, "red");
+    }
   } else {
     showNotification(
       "No GUI terminal found – use in-shell shortcut instead",
@@ -1425,7 +1617,7 @@ function reselectByName(list, dataArray, selectedName) {
    ========================================================= */
 function withFocusedContainer(fn) {
   return () => {
-    if (screen.focused !== containersBox) return;
+    if (screen.focused !== containersBox) return; // ignore if not in containers
     const c = dataCache.containers[selectedContainerIndex];
     if (c) fn(c);
   };
@@ -1442,7 +1634,35 @@ screen.key(
 screen.key(
   ["r"],
   withFocusedContainer((c) => {
-    if (c.state === "running") restartContainer(c.name);
+    if (c.state === "running") {
+      showNotification(`Keyboard 'r' (Restart) triggered for ${c.name}.`, "blue");
+      restartContainer(c.name);
+    }
+  }),
+);
+
+screen.key(
+  ["t"],
+  withFocusedContainer((c) => {
+    if (c.state !== "running") {
+      showNotification("Keyboard 't' (Exec): Container must be running.", "red");
+      return;
+    }
+    showNotification(`Keyboard 't' (Exec) triggered for ${c.name}.`, "magenta");
+    execIntoContainer(c.name);
+  }),
+);
+
+screen.key(
+  ["C-t"],
+  withFocusedContainer((c) => {
+    if (c.state !== "running") {
+      showNotification("Keyboard 'C-t' (NewExec): Container must be running.", "red");
+      return;
+    }
+    const cmd = `${dockerCmd} exec -it ${c.name} sh -c "exec /bin/bash || exec /bin/sh"`;
+    showNotification(`Keyboard 'C-t' (NewExec) triggered for ${c.name}. Command: ${cmd}`, "magenta");
+    spawnNewWindow(cmd, `exec-${c.name}`);
   }),
 );
 
@@ -1450,18 +1670,22 @@ screen.key(["d"], () => {
   const f = screen.focused;
   if (f === containersBox) {
     const c = dataCache.containers[selectedContainerIndex];
-    if (!c) return;
+    if (!c) { showNotification("Keyboard 'd': No container selected for delete.", "red"); return; }
     confirmDelete(`Delete container ${c.name}?`, () => deleteContainer(c.name));
   } else if (f === imagesBox) {
     const img = dataCache.images[selectedImageIndex];
-    if (!img) return;
+    if (!img) { showNotification("Keyboard 'd': No image selected for delete.", "red"); return; }
     confirmDelete(`Delete image ${img.repo}:${img.tag}?`, () =>
       deleteImage(img.id),
     );
   } else if (f === volumesBox) {
     const vol = dataCache.volumes[selectedVolumeIndex];
-    if (!vol) return;
+    if (!vol) { showNotification("Keyboard 'd': No volume selected for delete.", "red"); return; }
     confirmDelete(`Delete volume ${vol.name}?`, () => deleteVolume(vol.name));
+  } else if (f === networksBox) {
+    const net = dataCache.networks[selectedNetworkIndex];
+    if (!net) { showNotification("Keyboard 'd': No network selected for delete.", "red"); return; }
+    confirmDelete(`Delete network ${net.name}?`, () => deleteNetwork(net.name));
   }
 });
 
@@ -1479,7 +1703,7 @@ screen.key(
 /* ---------- in-shell exec (replaces screen.spawn) ---------- */
 /* ---------- in-shell exec (replaces screen.spawn) ---------- */
 screen.key(
-  ["e"],
+  ["t"],
   withFocusedContainer((c) => {
     if (c.state !== "running") {
       showNotification("Container must be running to exec", "red");
@@ -1589,7 +1813,7 @@ screen.key(
 );
 
 screen.key(
-  ["C-e"],
+  ["C-t"],
   withFocusedContainer((c) => {
     if (c.state !== "running") {
       showNotification("Container must be running to exec", "red");
@@ -1597,6 +1821,14 @@ screen.key(
     }
     const cmd = `${dockerCmd} exec -it ${c.name} sh -c "exec /bin/bash || exec /bin/sh"`;
     spawnNewWindow(cmd, `exec-${c.name}`);
+  }),
+);
+
+screen.key(
+  ["C-l"],
+  withFocusedContainer((c) => {
+    const cmd = `${dockerCmd} logs -f ${c.name}`;
+    spawnNewWindow(cmd, `logs-${c.name}`);
   }),
 );
 
@@ -1642,6 +1874,18 @@ function confirmDelete(prompt, onConfirm) {
     if (value) onConfirm();
     screen.render();
   });
+}
+
+async function deleteNetwork(networkName) {
+  if (!networkName) return;
+  showNotification(`Deleting network ${networkName}...`, "yellow");
+  try {
+    await execPromise(`${dockerCmd} network rm ${networkName}`, { timeout: 5000 });
+    showNotification(`Network ${networkName} deleted successfully!`, "green");
+    updateAll();
+  } catch (error) {
+    showNotification(`Failed to delete network ${networkName}: ${error.message}`, "red");
+  }
 }
 
 async function deleteImage(imageId) {
