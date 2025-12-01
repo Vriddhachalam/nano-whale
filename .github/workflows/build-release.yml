@@ -31,7 +31,8 @@ jobs:
   # Job 2: Build binaries for all OSes
   # ----------------------------------------
   build:
-    needs: create_release   # ensures release exists before uploading
+    needs: [create_release]
+    if: always()
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
