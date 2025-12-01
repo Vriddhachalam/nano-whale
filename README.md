@@ -82,10 +82,10 @@ For Linux users who prefer a standalone executable, download the latest release 
 
 ```bash
 # 1. Download the executable
-curl -L -o nano-whale-linux-latest-manual https://github.com/Vriddhachalam/nano-whale/releases/latest/download/nano-whale-ubuntu-latest-manual
+curl -L -o nano-whale-linux-latest-manual https://github.com/Vriddhachalam/nano-whale/releases/latest/download/nano-whale-ubuntu-latest
 
 # 2. Move to /usr/local/bin and rename
-sudo mv nano-whale-linux-latest-manual /usr/local/bin/nano-whale
+sudo mv nano-whale-ubuntu-latest /usr/local/bin/nano-whale
 
 # 3. Make the executable runnable
 sudo chmod +x /usr/local/bin/nano-whale
