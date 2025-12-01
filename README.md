@@ -9,53 +9,17 @@
 
 > ⚠️ **DEPRECATION NOTICE**: The original Tkinter GUI version of Nano Whale has been deprecated. This repository now contains the new and improved **Terminal User Interface (TUI)** version built with Textual. For the legacy version, see the `legacy-tkinter` branch.
 
-**STOP!** Before you go any further... are you tired of the lag, the CPU spikes, and the general bulk of Docker Desktop?
-
-Meet **Nano Whale TUI**! A blazingly fast, lightweight **Terminal User Interface** for managing Docker containers, images, and volumes via WSL2. Built with [Textual](https://textual.textualize.io/), Nano Whale provides an elegant, keyboard-driven interface for Docker management without the overhead of Docker Desktop.
+Meet **Nano Whale TUI**! A blazingly fast, lightweight **Terminal User Interface** for managing Docker containers, images, and volumes. Built with [Textual](https://textual.textualize.io/), Nano Whale provides an elegant, keyboard-driven interface for Docker management without the overhead of Docker Desktop.
 
 ---
 
 ## ✨ Features
 
-### 🖥️ Split-Pane Interface
-- **Left Pane**: Three stacked tables showing Containers, Images, and Volumes simultaneously
-- **Right Pane**: Detailed view with 5 tabbed panels for container inspection
-- **Bottom Panel**: Real-time log output and status messages
-
-### 📦 Container Management
-- Start, stop, and restart containers
-- View container logs (in-shell or new terminal window)
-- Launch interactive terminal sessions (exec into containers)
-- Delete containers with safety checks
-
-### 🖼️ Image Management
-- View all Docker images with size and creation info
-- Delete unused images
-- Multi-select for batch deletion
-
-### 💾 Volume Management
-- List all Docker volumes
-- Delete volumes (with force option)
-- Batch operations support
-
-### 🔍 Container Inspection (Right Pane Tabs)
-| Tab | Content |
-|-----|---------|
-| **Info (1)** | Container ID, Image, Status, PID, Exit Code, Platform, Hostname, Restart Policy |
-| **Env (2)** | All environment variables |
-| **Ports (3)** | Port mappings (host → container) |
-| **Volumes (4)** | Volume mounts with source, destination, and mode |
-| **Networks (5)** | Network configuration, IP addresses, gateways, MAC addresses |
-
-### ⚡ Additional Features
-- 🚀 **Lightning Fast** - Minimal resource footprint, native WSL2 integration
-- ⌨️ **Keyboard-Driven** - Full keyboard navigation
-- 🖱️ **Mouse Support** - Click anywhere on a table section to switch
-- 📦 **Multi-Select** - Batch operations on multiple items
-- 🔄 **Auto-Refresh** - Manual refresh with `A` key
-- 🧹 **Smart Prune** - Two-step confirmation for system cleanup
-- 🎨 **Visual Feedback** - Highlighted labels show active table
-- 🌐 **Cross-Platform** - Windows (WSL), Linux, macOS support
+- **Blazingly Fast & Lightweight**: Minimal resource footprint, native WSL2 integration.
+- **Efficient Management**: Keyboard-driven TUI for containers, images, and volumes.
+- **Detailed Inspection**: Quickly view container info, environment, ports, volumes, and networks.
+- **Batch Operations**: Multi-select for streamlined management (start, stop, delete).
+- **Cross-Platform**: Works seamlessly on Windows (WSL), Linux, and macOS.
 
 ---
 
@@ -78,51 +42,6 @@ Meet **Nano Whale TUI**! A blazingly fast, lightweight **Terminal User Interface
 
 ---
 
-## 🎯 Why Nano Whale TUI?
-
-Tired of Docker Desktop's resource consumption? Nano Whale gives you:
-
-- **No GUI Overhead** - Terminal-based means minimal memory usage
-- **WSL2 Native** - Direct integration with Docker Engine in WSL2
-- **Keyboard Efficiency** - Faster than clicking through GUI menus
-- **SSH-Friendly** - Works perfectly over SSH connections
-- **Open Source** - Free and community-driven
-
----
-
-## 📋 Prerequisites
-
-- **Windows 10/11** with WSL2 installed
-- **Docker Engine** running in WSL2 (not Docker Desktop)
-- **Python 3.8+**
-
-### Platform Support
-
-| Platform | Docker Command |
-|----------|---------------|
-| Windows (WSL2) | `wsl docker ...` |
-| Linux | `docker ...` |
-| macOS | `docker ...` |
-
----
-
-### Quick WSL2 & Docker Setup
-
-If you don't have WSL2 and Docker Engine set up:
-
-```bash
-# Install WSL2
-wsl --install
-
-# After restart, install Docker in WSL
-wsl
-sudo apt update
-sudo apt install docker.io -y
-sudo service docker start
-```
-
----
-
 ## 📦 Installation
 
 ### Via pip (Recommended)
@@ -137,12 +56,42 @@ pip install nano-whale
 pipx install nano-whale
 ```
 
-### From Source
+## From GitHub Releases
+
+### Via Windows Executable
+For Windows users who prefer a standalone executable without Python or `pip` installation, you can [download](https://github.com/Vriddhachalam/nano-whale/releases/latest/download/nano-whale-windows-latest-manual.exe) the latest release directly from GitHub or follow the below PowerShell script for shell command.
+
+```powershell
+# 1. Download the executable
+Invoke-WebRequest -Uri "https://github.com/Vriddhachalam/nano-whale/releases/latest/download/nano-whale-windows-latest-manual.exe" -OutFile "nano-whale-windows-latest-manual.exe"
+
+# 2. Move to C:\Tools and rename
+New-Item -Path "C:\Tools" -ItemType Directory -Force
+Move-Item .\nano-whale-windows-latest-manual.exe C:\Tools\nano-whale.exe
+
+# 3. Add C:\Tools to PATH
+[System.Environment]::SetEnvironmentVariable("Path", $env:Path + ";C:\Tools", [System.EnvironmentVariableTarget]::Machine)
+
+# 4. Test installation (requires terminal restart if PATH was updated)
+nano-whale
+```
+---
+
+### Via Linux Executable
+For Linux users who prefer a standalone executable, download the latest release from GitHub using this bash script:
 
 ```bash
-git clone https://github.com/Vriddhachalam/nano-whale.git
-cd nano-whale
-pip install -e .
+# 1. Download the executable
+curl -L -o nano-whale-linux-latest-manual https://github.com/Vriddhachalam/nano-whale/releases/latest/download/nano-whale-ubuntu-latest-manual
+
+# 2. Move to /usr/local/bin and rename
+sudo mv nano-whale-linux-latest-manual /usr/local/bin/nano-whale
+
+# 3. Make the executable runnable
+sudo chmod +x /usr/local/bin/nano-whale
+
+# 4. Test installation
+nano-whale
 ```
 
 ---
@@ -217,76 +166,34 @@ python nano_whale/main.py
 
 ---
 
-## 🖥️ Terminal Talk: Docker Commands via WSL
+### Viewing Logs / Exec into containers
 
-Since Nano Whale manages Docker via WSL 2, the standard docker command is no longer available directly in your regular Windows Command Prompt or PowerShell.
-
-To run manual Docker commands in your Windows (git bash/cmd/powershell) terminal, you must simply prefix them with `wsl`:
-
-| Instead of (Old Way) | Use (New Nano Whale Way) |
-| ------------- | ------------- |
-| `docker ps` | `wsl docker ps` |
-| `docker images` | `wsl docker images` |
-| `docker run ...` | `wsl docker run ...` |
-
-## 📖 Usage Examples
-
-### Viewing Container Details
-
-1. Launch Nano Whale: `nano-whale`
-2. First container is automatically selected and details shown
-3. Press `1-5` to switch between Info, Env, Ports, Volumes, Networks tabs
-4. Use `↑/↓` to select different containers
-
-### Starting Multiple Containers
-
-1. Press `C` to ensure Containers table is focused
-2. Press `M` on first container to mark it `[*]`
-3. Press `↓` then `M` to mark more containers
-4. Press `S` to start all marked containers
-
-### Viewing Live Logs
-
-**In-Shell (suspends TUI):**
+**In-Shell (suspends TUI, Useful for non GUI servers):**
 1. Select a running container
-2. Press `L`
-3. Logs stream in terminal
-4. Press `Ctrl+C` to return to TUI
+2. Press `L` or `T` Logs stream
+3. Press `Ctrl+C` or `Ctrl+D` to return to TUI
 
 <p align="center">
   <img src="./img/in_shell_logs.png" alt="Nano Whale TUI - In-Shell Logs" width="900">
 </p>
 
-**In New Window:**
+<p align="center">
+  <img src="./img/in_shell_exec_terminal.png" alt="Nano Whale TUI - In-Shell Exec Terminal" width="900">
+</p>
+
+
+**In New Window (TUI remains active):**
 1. Select a running container
-2. Press `Ctrl+L`
-3. New terminal window opens with streaming logs
-4. TUI remains active
+2. Press `Ctrl+L` or `Ctrl+T`
 
 <p align="center">
   <img src="./img/new_shell_logs.png" alt="Nano Whale TUI - New Shell Logs" width="900">
 </p>
 
-### Exec into Container
-
-**In-Shell:**
-1. Select a running container
-2. Press `T`
-3. Interactive shell opens
-4. Type `exit` to return to TUI
-
-<p align="center">
-  <img src="./img/in_shell_exec_terminal.png" alt="Nano Whale TUI - In-Shell Exec Terminal" width="900">
-</p>
-
-**In New Window:**
-1. Select a running container
-2. Press `Ctrl+T`
-3. New terminal with shell opens
-
 <p align="center">
   <img src="./img/new_shell_terminal.png" alt="Nano Whale TUI - New Shell Terminal" width="900">
 </p>
+
 
 ### Cleaning Up System
 
@@ -295,37 +202,6 @@ To run manual Docker commands in your Windows (git bash/cmd/powershell) terminal
 3. Executes `docker system prune -a -f`
 4. Removes all unused containers, images, and volumes
 
-### Switching Between Tables
-
-**Keyboard:**
-- `C` → Containers
-- `I` → Images  
-- `V` → Volumes
-
-**Mouse:**
-- Click anywhere within a table's border area
-
-
-**Key Benefits:**
-- ✅ No Docker Desktop required
-- ✅ Direct Docker Engine access
-- ✅ Minimal overhead
-- ✅ Works over SSH
-
----
-
-## 🔧 Configuration
-
-Nano Whale auto-detects your platform:
-
-| Platform | Detection | Command Prefix |
-|----------|-----------|----------------|
-| Windows + WSL | `wsl` available | `wsl docker` |
-| Windows (native) | No WSL | `docker` |
-| Linux | `platform.system()` | `docker` |
-| macOS | `platform.system()` | `docker` |
-
----
 
 ## 💻 Dev Zone: Running from Source
 
@@ -353,20 +229,9 @@ python nano_whale/main.py
 
 ### 📦 Building Portable Executable with Nuitka
 
-Want to create a standalone `.exe` that doesn't require Python installed? Use [Nuitka](https://nuitka.net/)!
-
-**Prerequisites:**
-- Python 3.8+
-- C compiler (MinGW on Windows, GCC on Linux)
-- Nuitka (`pip install nuitka`)
-
 **Build Command:**
 
 ```bash
-# Windows - Build standalone exe
-python -m nuitka --standalone --onefile --enable-plugin=tk-inter --windows-console-mode=force --output-filename=nano-whale.exe nano_whale/main.py
-
-# Linux/macOS - Build standalone binary
 python -m nuitka --standalone --onefile --output-filename=nano-whale nano_whale/main.py
 ```
 
@@ -375,13 +240,8 @@ python -m nuitka --standalone --onefile --output-filename=nano-whale nano_whale/
 |--------|-------------|
 | `--standalone` | Include all dependencies |
 | `--onefile` | Package everything into a single executable |
-| `--enable-plugin=tk-inter` | Include Tkinter support (if needed) |
 | `--windows-console-mode=force` | Keep console window for TUI |
 | `--output-filename` | Name of the output executable |
-
-**Output:**
-- Windows: `nano-whale.exe` (~15-25 MB)
-- Linux/macOS: `nano-whale` binary
 
 The portable executable can be distributed and run on any compatible system without Python installation!
 
@@ -417,56 +277,17 @@ sudo usermod -aG docker $USER
 # Then log out and back in
 ```
 
-### Terminal commands not opening new windows
-
-Nano Whale tries multiple terminal emulators:
-- **Windows**: Windows Terminal (`wt.exe`), `cmd.exe`
-- **Linux**: `gnome-terminal`, `konsole`, `xfce4-terminal`, `xterm`
-- **macOS**: Terminal.app, iTerm2
-
-Ensure at least one is installed and accessible in PATH.
-
 ---
 
 ## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
-```bash
-# Clone
-git clone https://github.com/Vriddhachalam/nano-whale.git
-cd nano-whale
-
-# Setup
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-pip install -e .
-
-# Run
-python nano_whale/main.py
-```
-
 ---
 
 ## 📜 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-## 🙏 Acknowledgments
-
-- Built with [Textual](https://textual.textualize.io/) by Textualize.io
-- Inspired by lazydocker and the need for a lightweight Docker Desktop alternative
-- Thanks to the Docker and WSL2 teams for their excellent tools
-
----
-
-## 📞 Support
-
-- **Issues**: [GitHub Issues](https://github.com/Vriddhachalam/nano-whale/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/Vriddhachalam/nano-whale/discussions)
-- **Email**: svriddhachalam@gmail.com
 
 ---
 
