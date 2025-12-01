@@ -59,15 +59,14 @@ pipx install nano-whale
 ## From GitHub Releases
 
 ### Via Windows Executable
-For Windows users who prefer a standalone executable without Python or `pip` installation, you can [download](https://github.com/Vriddhachalam/nano-whale/releases/latest/download/nano-whale-windows-latest-manual.exe) the latest release directly from GitHub or follow the below PowerShell script for shell command.
-
+For Windows users who prefer a standalone executable without Python or `pip` installation, you can [download](https://github.com/Vriddhachalam/nano-whale/releases/latest/download/nano-whale-windows-latest.exe) the latest release directly from GitHub or follow the below PowerShell script for shell command.
 ```powershell
 # 1. Download the executable
-Invoke-WebRequest -Uri "https://github.com/Vriddhachalam/nano-whale/releases/latest/download/nano-whale-windows-latest-manual.exe" -OutFile "nano-whale-windows-latest-manual.exe"
+Invoke-WebRequest -Uri "https://github.com/Vriddhachalam/nano-whale/releases/latest/download/nano-whale-windows-latest.exe" -OutFile "nano-whale-windows-latest.exe"
 
 # 2. Move to C:\Tools and rename
 New-Item -Path "C:\Tools" -ItemType Directory -Force
-Move-Item .\nano-whale-windows-latest-manual.exe C:\Tools\nano-whale.exe
+Move-Item .\nano-whale-windows-latest.exe C:\Tools\nano-whale.exe
 
 # 3. Add C:\Tools to PATH
 [System.Environment]::SetEnvironmentVariable("Path", $env:Path + ";C:\Tools", [System.EnvironmentVariableTarget]::Machine)
