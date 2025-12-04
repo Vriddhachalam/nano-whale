@@ -1223,7 +1223,10 @@ class DockerTUI(App[None]):
         if not items:
             return
 
-        table = self.query_one(DataTable)
+        table = self._get_current_table()
+        if not table:
+            self.notify("No active table found.", severity="error")
+            return
         try:
             col_labels = [str(col.label) for col in table.columns.values()][1:]
             
