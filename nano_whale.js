@@ -30,18 +30,25 @@ const maxHistoryPoints = 80;
 // Streaming processes
 let statsProcess = null;
 let logProcess = null;
+let fullscreenChild = null; // Track in-shell logs/exec child process
 
 // State
 let selectedContainerIndex = 0;
 let selectedImageIndex = 0;
 let selectedVolumeIndex = 0;
-let selectedNetworkIndex = 0; // ← add this
+let selectedNetworkIndex = 0;
+
+// Multi-select state (Sets of names/ids for marked items)
+let markedContainers = new Set();
+let markedImages = new Set();
+let markedVolumes = new Set();
 
 let logsContent = "";
 let logsAutoScroll = true;
 let currentTab = 0; // 0=Logs, 1=Stats, 2=Env, 3=Config, 4=Top
 const tabNames = ["Logs", "Stats", "Env", "Config", "Top"];
 let helpBarButtonsMap = []; // Stores clickable areas and their associated handler function
+let inFullscreenMode = false; // Track when in logs/exec fullscreen mode
 
 // Create screen
 const screen = blessed.screen({
@@ -51,6 +58,13 @@ const screen = blessed.screen({
   fastCSR: true,
   mouse: true, // Enable mouse support
 });
+
+// Wrap screen.render to prevent rendering during fullscreen mode
+const originalRender = screen.render.bind(screen);
+screen.render = function () {
+  if (inFullscreenMode) return; // Don't render when in fullscreen logs/exec mode
+  originalRender();
+};
 
 // ==================== LEFT PANELS ====================
 
@@ -174,45 +188,45 @@ const tabHeader = blessed.box({
   tags: true,
   mouse: true, // Enable mouse for tabHeader
 });
- 
+
 tabHeader.on('click', async (data) => {
-    const clickXInContent = data.x - tabHeader.aleft;
+  const clickXInContent = data.x - tabHeader.aleft;
 
-    let currentTabXOffset = 1; // Start at 1 because 0 is the left border (invisible but present in blessed coordinates)
+  let currentTabXOffset = 1; // Start at 1 because 0 is the left border (invisible but present in blessed coordinates)
 
-    for (let i = 0; i < tabNames.length; i++) {
-        const tabName = tabNames[i];
-        // Visible width of the tab name itself, including the two padding spaces
-        const tabContentWidth = tabName.length + 2;
+  for (let i = 0; i < tabNames.length; i++) {
+    const tabName = tabNames[i];
+    // Visible width of the tab name itself, including the two padding spaces
+    const tabContentWidth = tabName.length + 2;
 
-        // Determine the width of the separator following this tab, if any
-        let separatorWidth = 0;
-        if (i < tabNames.length - 1) {
-            separatorWidth = 1; // For the single hyphen character
-        }
-
-        // The total width of this tab segment, including its content and its separator
-        const totalSegmentClickableWidth = tabContentWidth + separatorWidth;
-        const tabMinX = currentTabXOffset;
-        const tabMaxX = currentTabXOffset + totalSegmentClickableWidth - 1; // Max X is inclusive
-
-        // Check if the click occurred within the bounds of this tab segment
-        if (clickXInContent >= tabMinX && clickXInContent <= tabMaxX) {
-            if (currentTab !== i) {
-                currentTab = i;
-                updateTabHeader();
-                await updateCurrentTab();
-                screen.render();
-            }
-            return; // Found the clicked tab, exit function
-        }
-        // Advance the offset for the next tab segment
-        currentTabXOffset += totalSegmentClickableWidth;
+    // Determine the width of the separator following this tab, if any
+    let separatorWidth = 0;
+    if (i < tabNames.length - 1) {
+      separatorWidth = 1; // For the single hyphen character
     }
+
+    // The total width of this tab segment, including its content and its separator
+    const totalSegmentClickableWidth = tabContentWidth + separatorWidth;
+    const tabMinX = currentTabXOffset;
+    const tabMaxX = currentTabXOffset + totalSegmentClickableWidth - 1; // Max X is inclusive
+
+    // Check if the click occurred within the bounds of this tab segment
+    if (clickXInContent >= tabMinX && clickXInContent <= tabMaxX) {
+      if (currentTab !== i) {
+        currentTab = i;
+        updateTabHeader();
+        await updateCurrentTab();
+        screen.render();
+      }
+      return; // Found the clicked tab, exit function
+    }
+    // Advance the offset for the next tab segment
+    currentTabXOffset += totalSegmentClickableWidth;
+  }
 });
 
- // Main content area (right side)
- const contentBox = blessed.box({
+// Main content area (right side)
+const contentBox = blessed.box({
   top: 3,
   left: "40%",
   width: "60%",
@@ -410,6 +424,67 @@ function updateHelpBar() {
     confirmDelete(`Delete network ${net.name}?`, () => deleteNetwork(net.name));
   }, "N"); // Using 'N' as a logical key for notification/debug
 
+  // --- Multi-select Actions ---
+  appendSegment("{bold}m{/}:Mark", async () => {
+    const f = screen.focused;
+    if (f === containersBox) {
+      const c = dataCache.containers[selectedContainerIndex];
+      if (c) {
+        if (markedContainers.has(c.name)) markedContainers.delete(c.name);
+        else markedContainers.add(c.name);
+        await updateContainers();
+      }
+    } else if (f === imagesBox) {
+      const img = dataCache.images[selectedImageIndex];
+      if (img) {
+        if (markedImages.has(img.id)) markedImages.delete(img.id);
+        else markedImages.add(img.id);
+        await updateImages(true);
+      }
+    } else if (f === volumesBox) {
+      const vol = dataCache.volumes[selectedVolumeIndex];
+      if (vol) {
+        if (markedVolumes.has(vol.name)) markedVolumes.delete(vol.name);
+        else markedVolumes.add(vol.name);
+        await updateVolumes(true);
+      }
+    }
+    screen.render();
+  }, "m");
+
+  appendSegment("{bold}C-a{/}:SelAll", async () => {
+    const f = screen.focused;
+    if (f === containersBox) {
+      if (markedContainers.size === dataCache.containers.length) {
+        markedContainers.clear();
+        showNotification("Deselected all containers", "yellow");
+      } else {
+        dataCache.containers.forEach(c => markedContainers.add(c.name));
+        showNotification(`Selected ${markedContainers.size} containers`, "green");
+      }
+      await updateContainers();
+    } else if (f === imagesBox) {
+      if (markedImages.size === dataCache.images.length) {
+        markedImages.clear();
+        showNotification("Deselected all images", "yellow");
+      } else {
+        dataCache.images.forEach(img => markedImages.add(img.id));
+        showNotification(`Selected ${markedImages.size} images`, "green");
+      }
+      await updateImages(true);
+    } else if (f === volumesBox) {
+      if (markedVolumes.size === dataCache.volumes.length) {
+        markedVolumes.clear();
+        showNotification("Deselected all volumes", "yellow");
+      } else {
+        dataCache.volumes.forEach(v => markedVolumes.add(v.name));
+        showNotification(`Selected ${markedVolumes.size} volumes`, "green");
+      }
+      await updateVolumes(true);
+    }
+    screen.render();
+  }, "C-a");
+
 
   // --- Special Terminal Spawning Actions ---
   appendSegment("{bold}C-t{/}:NewExec", () => {
@@ -443,10 +518,10 @@ function updateHelpBar() {
     showNotification(`Auto-scroll: ${logsAutoScroll ? "ON" : "OFF"}`, logsAutoScroll ? "green" : "yellow");
   }, "a");
 
-  appendSegment("{bold}R{/}:Refresh", async () => {
+  appendSegment("{bold}F5{/}:Refresh", async () => {
     await updateAll();
     showNotification("Refreshed data!", "green");
-  }, "S-r");
+  }, "F5");
 
   helpBar.setContent(helpString);
   screen.render(); // Ensure the help bar is updated on screen
@@ -584,7 +659,7 @@ function startStatsStream() {
   if (statsProcess) {
     try {
       statsProcess.kill();
-    } catch (_) {}
+    } catch (_) { }
   }
 
   const cmdParts = dockerCmd.split(" ");
@@ -637,17 +712,17 @@ function startStatsStream() {
       if (memHistory[name].length > maxHistoryPoints) memHistory[name].shift();
     }
 
-    if (currentTab === 1) updateStatsTab();
+    if (!inFullscreenMode && currentTab === 1) updateStatsTab();
   });
 
   statsProcess.stderr.on("data", (d) => {
     // Optionally log to a file or ignore
   });
 
-  statsProcess.on("error", () => {});
+  statsProcess.on("error", () => { });
   statsProcess.on("close", () => {
     setTimeout(() => {
-      if (!statsProcess || statsProcess.killed) startStatsStream();
+      if (!inFullscreenMode && (!statsProcess || statsProcess.killed)) startStatsStream();
     }, 2000);
   });
 }
@@ -901,6 +976,7 @@ function showNotification(message, color = "green") {
 
 function showContainerLogs(containerName, tail = "200") {
   if (!containerName) return;
+  if (inFullscreenMode) return; // Don't start log streaming in fullscreen mode
 
   stopLogStream();
 
@@ -919,9 +995,13 @@ function showContainerLogs(containerName, tail = "200") {
     containerName,
   ];
 
-  logProcess = spawn(baseCmd, args);
+  logProcess = spawn(baseCmd, args, {
+    stdio: ['ignore', 'pipe', 'pipe'],  // Explicitly pipe stdout/stderr
+    detached: false,  // Keep attached to parent process
+  });
 
   logProcess.stdout.on("data", (data) => {
+    if (inFullscreenMode) return; // Don't update in fullscreen mode
     logsContent += data.toString();
     if (logsContent.length > 100000) {
       logsContent = logsContent.slice(-100000);
@@ -936,6 +1016,7 @@ function showContainerLogs(containerName, tail = "200") {
   });
 
   logProcess.stderr.on("data", (data) => {
+    if (inFullscreenMode) return; // Don't update in fullscreen mode
     logsContent += data.toString();
     if (logsContent.length > 100000) {
       logsContent = logsContent.slice(-100000);
@@ -950,6 +1031,7 @@ function showContainerLogs(containerName, tail = "200") {
   });
 
   logProcess.on("error", (err) => {
+    if (inFullscreenMode) return; // Don't update in fullscreen mode
     logsContent += `\n{red-fg}Error: ${err.message}{/red-fg}`;
     if (currentTab === 0) {
       contentBox.setContent(logsContent);
@@ -960,7 +1042,13 @@ function showContainerLogs(containerName, tail = "200") {
 
 function stopLogStream() {
   if (logProcess) {
-    logProcess.kill();
+    try {
+      // Destroy streams first
+      if (logProcess.stdout) logProcess.stdout.destroy();
+      if (logProcess.stderr) logProcess.stderr.destroy();
+      // Force kill the process
+      logProcess.kill('SIGKILL');
+    } catch (_) { }
     logProcess = null;
   }
 }
@@ -1376,10 +1464,13 @@ async function updateContainers() {
       if (c.status.includes("healthy"))
         status = "{green-fg}running (healthy){/green-fg}";
 
+      // Show marker for multi-selected items
+      const marker = markedContainers.has(c.name) ? "{white-bg}{black-fg}[✓]{/black-fg}{/white-bg} " : "    ";
+
       const name = c.name.substring(0, 18).padEnd(18);
       const cpu = isRunning ? `${stat.cpu.toFixed(2)}%`.padStart(7) : "      -";
       const ports = c.ports ? c.ports.substring(0, 12) : "";
-      return `${status.padEnd(25)} {bold}${name}{/bold} ${cpu} {cyan-fg}${ports}{/cyan-fg}`;
+      return `${marker}${status.padEnd(25)} {bold}${name}{/bold} ${cpu} {cyan-fg}${ports}{/cyan-fg}`;
     };
 
     const indexRef = [selectedContainerIndex];
@@ -1392,21 +1483,23 @@ async function updateContainers() {
 }
 
 /* ---------- Images ---------- */
-async function updateImages() {
+async function updateImages(forceRender = false) {
   try {
     const images = await getImages();
 
     const dataChanged =
       JSON.stringify(images) !== JSON.stringify(dataCache.images);
-    if (!dataChanged) return;
+    if (!forceRender && !dataChanged) return;
 
     dataCache.images = images;
 
     const formatImage = (img) => {
+      // Show marker for multi-selected items
+      const marker = markedImages.has(img.id) ? "{white-bg}{black-fg}[✓]{/black-fg}{/white-bg} " : "    ";
       const name = img.repo.substring(0, 20).padEnd(20);
       const tag = img.tag.substring(0, 10).padEnd(10);
       const size = img.size.padEnd(10);
-      return `${name} {yellow-fg}${tag}{/yellow-fg} ${size}`;
+      return `${marker}${name} {yellow-fg}${tag}{/yellow-fg} ${size}`;
     };
 
     const indexRef = [selectedImageIndex];
@@ -1418,18 +1511,21 @@ async function updateImages() {
 }
 
 /* ---------- Volumes ---------- */
-async function updateVolumes() {
+async function updateVolumes(forceRender = false) {
   try {
     const volumes = await getVolumes();
 
     const dataChanged =
       JSON.stringify(volumes) !== JSON.stringify(dataCache.volumes);
-    if (!dataChanged) return;
+    if (!forceRender && !dataChanged) return;
 
     dataCache.volumes = volumes;
 
-    const formatVolume = (v) =>
-      `{magenta-fg}${v.driver.padEnd(8)}{/magenta-fg} ${v.name}`;
+    const formatVolume = (v) => {
+      // Show marker for multi-selected items
+      const marker = markedVolumes.has(v.name) ? "{white-bg}{black-fg}[✓]{/black-fg}{/white-bg} " : "    ";
+      return `${marker}{magenta-fg}${v.driver.padEnd(8)}{/magenta-fg} ${v.name}`;
+    };
 
     const indexRef = [selectedVolumeIndex];
     updateListIfChanged(volumesBox, volumes, formatVolume, indexRef);
@@ -1450,8 +1546,17 @@ async function updateNetworks() {
 
     dataCache.networks = networks;
 
-    const formatNetwork = (n) =>
-      `{blue-fg}${n.driver.padEnd(8)}{/blue-fg} ${n.name}`;
+    // Docker system default networks that can't be deleted
+    const systemNetworks = ['bridge', 'host', 'none'];
+
+    const formatNetwork = (n) => {
+      const isSystem = systemNetworks.includes(n.name);
+      if (isSystem) {
+        // Show system networks in gray/dim
+        return `{gray-fg}${n.driver.padEnd(8)} ${n.name} (system){/gray-fg}`;
+      }
+      return `{blue-fg}${n.driver.padEnd(8)}{/blue-fg} ${n.name}`;
+    };
 
     const indexRef = [selectedNetworkIndex];
     updateListIfChanged(networksBox, networks, formatNetwork, indexRef);
@@ -1478,23 +1583,29 @@ async function updateAll() {
 
 // ==================== KEYBOARD HANDLERS ====================
 
-// Quit
+// Quit (disabled when in fullscreen logs/exec mode)
 screen.key(["q", "C-c"], () => {
+  if (inFullscreenMode) return; // Don't quit when in fullscreen mode
   cleanup();
   process.exit(0);
 });
 
 // Refresh
-screen.key(["S-r"], () => updateAll());
+screen.key(["S-r"], () => {
+  if (inFullscreenMode) return;
+  updateAll();
+});
 
 // Tab navigation with arrow keys
 screen.key(["right"], async () => {
+  if (inFullscreenMode) return;
   currentTab = (currentTab + 1) % tabNames.length;
   updateTabHeader();
   await updateCurrentTab();
 });
 
 screen.key(["left"], async () => {
+  if (inFullscreenMode) return;
   currentTab = (currentTab - 1 + tabNames.length) % tabNames.length;
   updateTabHeader();
   await updateCurrentTab();
@@ -1508,19 +1619,104 @@ screen.key(["left"], async () => {
 
 // When user switches panels with 1-5
 screen.key(["2"], () => {
+  if (inFullscreenMode) return;
   containersBox.focus();
   screen.render();
 });
 screen.key(["3"], () => {
+  if (inFullscreenMode) return;
   imagesBox.focus();
   screen.render();
 });
 screen.key(["4"], () => {
+  if (inFullscreenMode) return;
   volumesBox.focus();
   screen.render();
 });
 screen.key(["5"], () => {
+  if (inFullscreenMode) return;
   networksBox.focus();
+  screen.render();
+});
+
+/* =========================================================
+   Multi-select key handlers
+   ========================================================= */
+
+// 'm' - Mark/Unmark current item
+screen.key(["m"], async () => {
+  if (inFullscreenMode) return;
+  const f = screen.focused;
+
+  if (f === containersBox) {
+    const c = dataCache.containers[selectedContainerIndex];
+    if (c) {
+      if (markedContainers.has(c.name)) {
+        markedContainers.delete(c.name);
+      } else {
+        markedContainers.add(c.name);
+      }
+      await updateContainers();
+    }
+  } else if (f === imagesBox) {
+    const img = dataCache.images[selectedImageIndex];
+    if (img) {
+      if (markedImages.has(img.id)) {
+        markedImages.delete(img.id);
+      } else {
+        markedImages.add(img.id);
+      }
+      await updateImages(true);
+    }
+  } else if (f === volumesBox) {
+    const vol = dataCache.volumes[selectedVolumeIndex];
+    if (vol) {
+      if (markedVolumes.has(vol.name)) {
+        markedVolumes.delete(vol.name);
+      } else {
+        markedVolumes.add(vol.name);
+      }
+      await updateVolumes(true);
+    }
+  }
+  screen.render();
+});
+
+// Ctrl+A - Select/Deselect all items in focused panel
+screen.key(["C-a"], async () => {
+  if (inFullscreenMode) return;
+  const f = screen.focused;
+
+  if (f === containersBox) {
+    if (markedContainers.size === dataCache.containers.length) {
+      // All selected, deselect all
+      markedContainers.clear();
+      showNotification("Deselected all containers", "yellow");
+    } else {
+      // Select all
+      dataCache.containers.forEach(c => markedContainers.add(c.name));
+      showNotification(`Selected ${markedContainers.size} containers`, "green");
+    }
+    await updateContainers();
+  } else if (f === imagesBox) {
+    if (markedImages.size === dataCache.images.length) {
+      markedImages.clear();
+      showNotification("Deselected all images", "yellow");
+    } else {
+      dataCache.images.forEach(img => markedImages.add(img.id));
+      showNotification(`Selected ${markedImages.size} images`, "green");
+    }
+    await updateImages(true);
+  } else if (f === volumesBox) {
+    if (markedVolumes.size === dataCache.volumes.length) {
+      markedVolumes.clear();
+      showNotification("Deselected all volumes", "yellow");
+    } else {
+      dataCache.volumes.forEach(v => markedVolumes.add(v.name));
+      showNotification(`Selected ${markedVolumes.size} volumes`, "green");
+    }
+    await updateVolumes(true);
+  }
   screen.render();
 });
 
@@ -1617,6 +1813,7 @@ function reselectByName(list, dataArray, selectedName) {
    ========================================================= */
 function withFocusedContainer(fn) {
   return () => {
+    if (inFullscreenMode) return; // Block all keys when in fullscreen mode
     if (screen.focused !== containersBox) return; // ignore if not in containers
     const c = dataCache.containers[selectedContainerIndex];
     if (c) fn(c);
@@ -1624,22 +1821,67 @@ function withFocusedContainer(fn) {
 }
 
 /* ---------- Container actions ---------- */
-screen.key(
-  ["s"],
-  withFocusedContainer((c) =>
-    c.state === "running" ? stopContainer(c.name) : startContainer(c.name),
-  ),
-);
+// 's' - Start/Stop container(s). Uses marked containers if any, otherwise current selection
+screen.key(["s"], async () => {
+  if (inFullscreenMode) return;
+  if (screen.focused !== containersBox) return;
 
-screen.key(
-  ["r"],
-  withFocusedContainer((c) => {
-    if (c.state === "running") {
-      showNotification(`Keyboard 'r' (Restart) triggered for ${c.name}.`, "blue");
-      restartContainer(c.name);
+  if (markedContainers.size > 0) {
+    // Batch operation on marked containers
+    const containers = dataCache.containers.filter(c => markedContainers.has(c.name));
+    const toStart = containers.filter(c => c.state !== "running");
+    const toStop = containers.filter(c => c.state === "running");
+
+    if (toStart.length > 0) {
+      showNotification(`Starting ${toStart.length} container(s)...`, "green");
+      for (const c of toStart) {
+        await startContainer(c.name);
+      }
     }
-  }),
-);
+    if (toStop.length > 0) {
+      showNotification(`Stopping ${toStop.length} container(s)...`, "yellow");
+      for (const c of toStop) {
+        await stopContainer(c.name);
+      }
+    }
+    markedContainers.clear();
+    await updateContainers();
+  } else {
+    // Single container action
+    const c = dataCache.containers[selectedContainerIndex];
+    if (c) {
+      c.state === "running" ? await stopContainer(c.name) : await startContainer(c.name);
+    }
+  }
+});
+
+// 'r' - Restart container(s). Uses marked containers if any, otherwise current selection
+screen.key(["r"], async () => {
+  if (inFullscreenMode) return;
+  if (screen.focused !== containersBox) return;
+
+  if (markedContainers.size > 0) {
+    // Batch operation on marked containers
+    const containers = dataCache.containers.filter(c => markedContainers.has(c.name) && c.state === "running");
+    if (containers.length > 0) {
+      showNotification(`Restarting ${containers.length} container(s)...`, "blue");
+      for (const c of containers) {
+        await restartContainer(c.name);
+      }
+    } else {
+      showNotification("No running containers selected for restart", "yellow");
+    }
+    markedContainers.clear();
+    await updateContainers();
+  } else {
+    // Single container action
+    const c = dataCache.containers[selectedContainerIndex];
+    if (c && c.state === "running") {
+      showNotification(`Restarting ${c.name}...`, "blue");
+      await restartContainer(c.name);
+    }
+  }
+});
 
 screen.key(
   ["C-t"],
@@ -1654,25 +1896,74 @@ screen.key(
   }),
 );
 
-screen.key(["d"], () => {
+screen.key(["d"], async () => {
+  if (inFullscreenMode) return; // Block when in fullscreen mode
   const f = screen.focused;
+
   if (f === containersBox) {
-    const c = dataCache.containers[selectedContainerIndex];
-    if (!c) { showNotification("Keyboard 'd': No container selected for delete.", "red"); return; }
-    confirmDelete(`Delete container ${c.name}?`, () => deleteContainer(c.name));
+    if (markedContainers.size > 0) {
+      // Batch delete marked containers
+      const count = markedContainers.size;
+      confirmDelete(`Delete ${count} container(s)?`, async () => {
+        showNotification(`Deleting ${count} container(s)...`, "red");
+        for (const name of markedContainers) {
+          await deleteContainer(name);
+        }
+        markedContainers.clear();
+        await updateContainers();
+      });
+    } else {
+      const c = dataCache.containers[selectedContainerIndex];
+      if (!c) { showNotification("Keyboard 'd': No container selected for delete.", "red"); return; }
+      confirmDelete(`Delete container ${c.name}?`, () => deleteContainer(c.name));
+    }
   } else if (f === imagesBox) {
-    const img = dataCache.images[selectedImageIndex];
-    if (!img) { showNotification("Keyboard 'd': No image selected for delete.", "red"); return; }
-    confirmDelete(`Delete image ${img.repo}:${img.tag}?`, () =>
-      deleteImage(img.id),
-    );
+    if (markedImages.size > 0) {
+      // Batch delete marked images
+      const count = markedImages.size;
+      confirmDelete(`Delete ${count} image(s)?`, async () => {
+        showNotification(`Deleting ${count} image(s)...`, "red");
+        for (const id of markedImages) {
+          await deleteImage(id);
+        }
+        markedImages.clear();
+        await updateImages();
+      });
+    } else {
+      const img = dataCache.images[selectedImageIndex];
+      if (!img) { showNotification("Keyboard 'd': No image selected for delete.", "red"); return; }
+      confirmDelete(`Delete image ${img.repo}:${img.tag}?`, () =>
+        deleteImage(img.id),
+      );
+    }
   } else if (f === volumesBox) {
-    const vol = dataCache.volumes[selectedVolumeIndex];
-    if (!vol) { showNotification("Keyboard 'd': No volume selected for delete.", "red"); return; }
-    confirmDelete(`Delete volume ${vol.name}?`, () => deleteVolume(vol.name));
+    if (markedVolumes.size > 0) {
+      // Batch delete marked volumes
+      const count = markedVolumes.size;
+      confirmDelete(`Delete ${count} volume(s)?`, async () => {
+        showNotification(`Deleting ${count} volume(s)...`, "red");
+        for (const name of markedVolumes) {
+          await deleteVolume(name);
+        }
+        markedVolumes.clear();
+        await updateVolumes();
+      });
+    } else {
+      const vol = dataCache.volumes[selectedVolumeIndex];
+      if (!vol) { showNotification("Keyboard 'd': No volume selected for delete.", "red"); return; }
+      confirmDelete(`Delete volume ${vol.name}?`, () => deleteVolume(vol.name));
+    }
   } else if (f === networksBox) {
     const net = dataCache.networks[selectedNetworkIndex];
     if (!net) { showNotification("Keyboard 'd': No network selected for delete.", "red"); return; }
+
+    // Block deletion of Docker system networks
+    const systemNetworks = ['bridge', 'host', 'none'];
+    if (systemNetworks.includes(net.name)) {
+      showNotification(`Cannot delete '${net.name}' - it's a Docker system default network`, "yellow");
+      return;
+    }
+
     confirmDelete(`Delete network ${net.name}?`, () => deleteNetwork(net.name));
   }
 });
@@ -1680,23 +1971,21 @@ screen.key(["d"], () => {
 /* ---------- In-shell logs & exec ---------- */
 screen.key(
   ["l"],
-  withFocusedContainer((c) => {
-    currentTab = 0;
-    updateTabHeader();
-    showContainerLogs(c.name, "all");
-    screen.render();
-  }),
-);
+  // withFocusedContainer((c) => {
+  //   currentTab = 0;
+  //   updateTabHeader();
+  //   showContainerLogs(c.name, "all");
+  //   screen.render();
+  // }),
 
-/* ---------- in-shell exec (replaces screen.spawn) ---------- */
-/* ---------- in-shell exec (replaces screen.spawn) ---------- */
-screen.key(
-  ["t"],
   withFocusedContainer((c) => {
     if (c.state !== "running") {
-      showNotification("Container must be running to exec", "red");
+      showNotification("Container must be running to in window full logs", "red");
       return;
     }
+
+    // Mark that we're in fullscreen mode (disables Ctrl+C quit)
+    inFullscreenMode = true;
 
     // 1. Stop all background activity
     if (containersInterval) {
@@ -1711,17 +2000,169 @@ screen.key(
     if (statsProcess) {
       try {
         statsProcess.kill();
-      } catch (_) {}
+      } catch (_) { }
       statsProcess = null;
     }
 
     // 2. Completely suspend the blessed interface
+    screen.lockKeys = true; // Prevent blessed from processing any keys
     screen.program.showCursor();
     screen.program.disableMouse();
     screen.program.clear();
     screen.program.normalBuffer();
 
-    // Detach all input handling
+    // Detach all input handling from blessed
+    screen.program.input.pause();
+    screen.program.output.write("\x1b[?1049l"); // Exit alternate screen
+    screen.program.output.write("\x1b[?25h"); // Show cursor
+
+    // Reset terminal to cooked mode
+    if (process.stdin.setRawMode) {
+      process.stdin.setRawMode(false);
+    }
+
+    // 3. Small delay to ensure terminal is ready
+    setTimeout(() => {
+      // Build command args without shell wrapper
+      const cmdParts = isWindows
+        ? ['wsl', 'docker', 'logs', '-f', c.name]
+        : ['docker', 'logs', '-f', c.name];
+      const baseCmd = cmdParts[0];
+      const args = cmdParts.slice(1);
+
+      // Enable raw mode to capture Ctrl+D
+      if (process.stdin.setRawMode) {
+        process.stdin.setRawMode(true);
+      }
+      process.stdin.resume();
+
+      // Print instruction header at top of terminal
+      console.log('\n🐳 Streaming logs for ' + c.name + '...');
+      console.log('📋 Press Ctrl+D to return to nano-whale UI\n');
+
+      const child = spawn(baseCmd, args, {
+        stdio: ["ignore", "inherit", "inherit"], // Don't inherit stdin, we handle it
+        detached: true, // Create a new process group so we can kill the whole tree
+      });
+
+      // Track for cleanup
+      fullscreenChild = child;
+
+      // Listen for Ctrl+D to exit logs (Ctrl+C is disabled)
+      const onData = (key) => {
+        if (key[0] === 0x04) { // Only Ctrl+D exits
+          // Kill the entire process group
+          try {
+            process.kill(-child.pid, 'SIGKILL');
+          } catch (_) {
+            child.kill('SIGKILL');
+          }
+        }
+      };
+      process.stdin.on('data', onData);
+
+      child.on("exit", () => {
+        fullscreenChild = null; // Clear the reference
+        // Remove the stdin listener
+        process.stdin.removeListener('data', onData);
+        // Small delay before restoring
+        setTimeout(async () => {
+          // 4. Restore raw mode
+          if (process.stdin.setRawMode) {
+            process.stdin.setRawMode(true);
+          }
+
+          // Mark that we've exited fullscreen mode
+          inFullscreenMode = false;
+
+          // 5. Restore blessed screen
+          screen.lockKeys = false; // Re-enable blessed key handling
+          screen.program.output.write("\x1b[?1049h"); // Enter alternate screen
+          screen.program.input.resume();
+          screen.program.alternateBuffer();
+          screen.program.enableMouse();
+          screen.program.hideCursor();
+
+          // Recreate the display
+          screen.alloc();
+          screen.realloc();
+
+          // Re-focus
+          containersBox.focus();
+          updateTabHeader();
+
+          // 6. Refresh all data
+          await updateAll();
+
+          // 7. Restart everything
+          startStatsStream();
+
+          containersInterval = setInterval(async () => {
+            await updateContainers();
+            if (currentTab === 1) updateStatsTab();
+            screen.render();
+          }, 3000);
+
+          miscInterval = setInterval(async () => {
+            await Promise.all([
+              updateImages(),
+              updateVolumes(),
+              updateNetworks(),
+            ]);
+            screen.render();
+          }, 15000);
+
+          // Restart logs if needed
+          const currentContainer = dataCache.containers[selectedContainerIndex];
+          if (currentTab === 0 && currentContainer) {
+            showContainerLogs(currentContainer.name, "100");
+          }
+
+          screen.render();
+        }, 100);
+      });
+    }, 100);
+  }),
+);
+
+/* ---------- in-shell exec (replaces screen.spawn) ---------- */
+/* ---------- in-shell exec (replaces screen.spawn) ---------- */
+screen.key(
+  ["t"],
+  withFocusedContainer((c) => {
+    if (c.state !== "running") {
+      showNotification("Container must be running to exec", "red");
+      return;
+    }
+
+    // Mark that we're in fullscreen mode (disables Ctrl+C quit)
+    inFullscreenMode = true;
+
+    // 1. Stop all background activity
+    if (containersInterval) {
+      clearInterval(containersInterval);
+      containersInterval = null;
+    }
+    if (miscInterval) {
+      clearInterval(miscInterval);
+      miscInterval = null;
+    }
+    stopLogStream();
+    if (statsProcess) {
+      try {
+        statsProcess.kill();
+      } catch (_) { }
+      statsProcess = null;
+    }
+
+    // 2. Completely suspend the blessed interface
+    screen.lockKeys = true; // Prevent blessed from processing any keys
+    screen.program.showCursor();
+    screen.program.disableMouse();
+    screen.program.clear();
+    screen.program.normalBuffer();
+
+    // Detach all input handling from blessed
     screen.program.input.pause();
     screen.program.output.write("\x1b[?1049l"); // Exit alternate screen
     screen.program.output.write("\x1b[?25h"); // Show cursor
@@ -1737,13 +2178,21 @@ screen.key(
         ? `wsl docker exec -it ${c.name} sh -c "exec /bin/bash || exec /bin/sh"`
         : `docker exec -it ${c.name} sh -c "exec /bin/bash || exec /bin/sh"`;
 
+      // Print instruction message
+      console.log('\n🐳 Entering shell in ' + c.name + '...');
+      console.log('📋 Press Ctrl+D to return to nano-whale UI\n');
+
       const child = spawn(shellCmd, [], {
         stdio: "inherit",
         shell: true,
         detached: false,
       });
 
+      // Track for cleanup
+      fullscreenChild = child;
+
       child.on("exit", () => {
+        fullscreenChild = null; // Clear the reference
         // Small delay before restoring
         setTimeout(async () => {
           // 4. Restore raw mode
@@ -1751,7 +2200,11 @@ screen.key(
             process.stdin.setRawMode(true);
           }
 
+          // Mark that we've exited fullscreen mode
+          inFullscreenMode = false;
+
           // 5. Restore blessed screen
+          screen.lockKeys = false; // Re-enable blessed key handling
           screen.program.output.write("\x1b[?1049h"); // Enter alternate screen
           screen.program.input.resume();
           screen.program.alternateBuffer();
@@ -1889,13 +2342,44 @@ async function deleteVolume(volumeName) {
 // ==================== CLEANUP ====================
 
 function cleanup() {
-  stopLogStream();
+  // Stop log stream
+  if (logProcess) {
+    try {
+      logProcess.kill('SIGKILL');
+    } catch (_) { }
+    logProcess = null;
+  }
+
+  // Stop stats stream
   if (statsProcess) {
-    statsProcess.kill();
+    try {
+      statsProcess.kill('SIGKILL');
+    } catch (_) { }
     statsProcess = null;
   }
-  if (containersInterval) clearInterval(containersInterval);
-  if (miscInterval) clearInterval(miscInterval);
+
+  // Kill fullscreen child process (in-shell logs/exec)
+  if (fullscreenChild) {
+    try {
+      // Kill the entire process group
+      process.kill(-fullscreenChild.pid, 'SIGKILL');
+    } catch (_) {
+      try {
+        fullscreenChild.kill('SIGKILL');
+      } catch (_) { }
+    }
+    fullscreenChild = null;
+  }
+
+  // Clear intervals
+  if (containersInterval) {
+    clearInterval(containersInterval);
+    containersInterval = null;
+  }
+  if (miscInterval) {
+    clearInterval(miscInterval);
+    miscInterval = null;
+  }
 }
 
 process.on("SIGINT", () => {
@@ -1906,6 +2390,10 @@ process.on("SIGINT", () => {
 process.on("SIGTERM", () => {
   cleanup();
   process.exit(0);
+});
+
+process.on("exit", () => {
+  cleanup();
 });
 
 // ==================== STARTUP ====================
