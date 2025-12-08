@@ -905,7 +905,7 @@ function showContainerLogs(containerName, tail = "200") {
   stopLogStream();
 
   logsContent = "";
-  contentBox.setContent("{cyan-fg}Loading logs...{/cyan-fg}");
+  // contentBox.setContent("{cyan-fg}Loading logs...{/cyan-fg}");
   screen.render();
 
   const cmdParts = dockerCmd.split(" ");
@@ -1101,7 +1101,7 @@ async function updateEnvTab() {
     return;
   }
 
-  contentBox.setContent("{cyan-fg}Loading environment variables...{/cyan-fg}");
+  // contentBox.setContent("{cyan-fg}Loading environment variables...{/cyan-fg}");
   screen.render();
 
   const envVars = await getContainerEnv(container.name);
@@ -1136,7 +1136,7 @@ async function updateConfigTab() {
     return;
   }
 
-  contentBox.setContent("{cyan-fg}Loading configuration...{/cyan-fg}");
+  // contentBox.setContent("{cyan-fg}Loading configuration...{/cyan-fg}");
   screen.render();
 
   const inspect = await getContainerInspect(container.name);
@@ -1217,7 +1217,7 @@ async function updateTopTab() {
     return;
   }
 
-  contentBox.setContent("{cyan-fg}Loading processes...{/cyan-fg}");
+  // contentBox.setContent("{cyan-fg}Loading processes...{/cyan-fg}");
   screen.render();
 
   let content = `{bold}{cyan-fg}Top Processes: ${container.name}{/cyan-fg}{/bold}\n`;
@@ -1642,18 +1642,6 @@ screen.key(
 );
 
 screen.key(
-  ["t"],
-  withFocusedContainer((c) => {
-    if (c.state !== "running") {
-      showNotification("Keyboard 't' (Exec): Container must be running.", "red");
-      return;
-    }
-    showNotification(`Keyboard 't' (Exec) triggered for ${c.name}.`, "magenta");
-    execIntoContainer(c.name);
-  }),
-);
-
-screen.key(
   ["C-t"],
   withFocusedContainer((c) => {
     if (c.state !== "running") {
@@ -1809,18 +1797,6 @@ screen.key(
         }, 100);
       });
     }, 100);
-  }),
-);
-
-screen.key(
-  ["C-t"],
-  withFocusedContainer((c) => {
-    if (c.state !== "running") {
-      showNotification("Container must be running to exec", "red");
-      return;
-    }
-    const cmd = `${dockerCmd} exec -it ${c.name} sh -c "exec /bin/bash || exec /bin/sh"`;
-    spawnNewWindow(cmd, `exec-${c.name}`);
   }),
 );
 
