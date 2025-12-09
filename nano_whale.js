@@ -3,7 +3,7 @@ const Module = require('module');
 
 // Detect if running as compiled Bun executable (works for all platforms)
 const isCompiled = !process.execPath.includes('bun') && (
-  process.execPath.includes('myapp') || 
+  process.execPath.includes('nano-whale') || 
   process.execPath.endsWith('.exe')
 );
 

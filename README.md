@@ -32,12 +32,12 @@
 
 #### Windows (PowerShell)
 ```powershell
-irm https://raw.githubusercontent.com/Vriddhachalam/nano-whale/main/install_win.sh | iex
+irm https://raw.githubusercontent.com/Vriddhachalam/nano-whale/js/install_win.sh | iex
 ```
 
 #### Linux / macOS
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Vriddhachalam/nano-whale/main/install_linux_mac.sh | sh
+curl -fsSL https://raw.githubusercontent.com/Vriddhachalam/nano-whale/js/install_linux_mac.sh | sh
 ```
 
 ### Option 2: Run with Bun
