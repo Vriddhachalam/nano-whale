@@ -23,7 +23,7 @@ mkdirSync("releases", { recursive: true });
 // Build for each platform
 for (const platform of platforms) {
   console.log(`\n🔨 Building for ${platform.name}...`);
-  const exeName = `myapp${platform.ext}`;
+  const exeName = `nano-whale${platform.ext}`;
   
   await $`bun build --compile --target=${platform.target} ./nano_whale.js --outfile ${exeName}`;
   
@@ -33,7 +33,7 @@ for (const platform of platforms) {
   mkdirSync(`${distDir}/node_modules`, { recursive: true });
   
   // Copy exe
-  cpSync(exeName, `${distDir}/myapp${platform.ext}`);
+  cpSync(exeName, `${distDir}/nano-whale${platform.ext}`);
   
   // Copy neo-blessed
   if (existsSync("node_modules/neo-blessed")) {
