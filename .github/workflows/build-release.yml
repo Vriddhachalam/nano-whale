@@ -32,56 +32,85 @@ jobs:
   # ----------------------------------------
   build:
     needs: [create_release]
+    runs-on: ubuntu-latest
     if: always()
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
         with:
-          python-version: "3.11"
+          bun-version: latest
 
-      - name: Install requirements
-        run: pip install -r requirements.txt nuitka
+      - name: Install dependencies
+        run: bun install
 
-      - name: Build executable
+      - name: Build Releases
+        run: bun run build.js
+
+      - name: Archive Releases
         run: |
-          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-            python -m nuitka --standalone --onefile --assume-yes-for-downloads nano_whale/main.py --output-filename=nano-whale
-          else
-            nuitka --onefile --follow-imports nano_whale/main.py --output-filename=nano-whale
+          cd releases
+          # Windows
+          if [ -d "windows-x64" ]; then
+            zip -r nano-whale-windows-x64.zip windows-x64/
           fi
+          # Linux
+          if [ -d "linux-x64" ]; then
+            tar -czf nano-whale-linux-x64.tar.gz linux-x64/
+          fi
+          # macOS x64
+          if [ -d "macos-x64" ]; then
+            tar -czf nano-whale-macos-x64.tar.gz macos-x64/
+          fi
+           # macOS arm64
+          if [ -d "macos-arm64" ]; then
+            tar -czf nano-whale-macos-arm64.tar.gz macos-arm64/
+          fi
+          ls -la
         shell: bash
-      # -------------------------------------------------------
-      # Upload to manual release (workflow_dispatch)
-      # -------------------------------------------------------
-      - name: Upload asset to manual release
-        if: github.event_name == 'workflow_dispatch'
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.REPO_TOKEN }}
-        with:
-          upload_url: ${{ needs.create_release.outputs.upload_url }}
-          asset_path: ./nano-whale${{ matrix.os == 'windows-latest' && '.exe' || '' }}
-          asset_name: nano-whale-${{ matrix.os }}-manual${{ matrix.os == 'windows-latest' && '.exe' || '' }}
-          asset_content_type: application/octet-stream
 
       # -------------------------------------------------------
-      # Upload to real release (release published)
+      # Upload to release (Manual or Published)
       # -------------------------------------------------------
-      - name: Upload Release Asset (real release)
-        if: github.event_name == 'release'
+      - name: Upload Windows
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.REPO_TOKEN }}
         with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ./nano-whale${{ matrix.os == 'windows-latest' && '.exe' || '' }}
-          asset_name: nano-whale-${{ matrix.os }}${{ matrix.os == 'windows-latest' && '.exe' || '' }}
-          asset_content_type: application/octet-stream
+          upload_url: ${{ github.event_name == 'workflow_dispatch' && needs.create_release.outputs.upload_url || github.event.release.upload_url }}
+          asset_path: ./releases/nano-whale-windows-x64.zip
+          asset_name: nano-whale-windows-x64.zip
+          asset_content_type: application/zip
+
+      - name: Upload Linux
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.REPO_TOKEN }}
+        with:
+          upload_url: ${{ github.event_name == 'workflow_dispatch' && needs.create_release.outputs.upload_url || github.event.release.upload_url }}
+          asset_path: ./releases/nano-whale-linux-x64.tar.gz
+          asset_name: nano-whale-linux-x64.tar.gz
+          asset_content_type: application/gzip
+
+      - name: Upload macOS x64
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.REPO_TOKEN }}
+        with:
+          upload_url: ${{ github.event_name == 'workflow_dispatch' && needs.create_release.outputs.upload_url || github.event.release.upload_url }}
+          asset_path: ./releases/nano-whale-macos-x64.tar.gz
+          asset_name: nano-whale-macos-x64.tar.gz
+          asset_content_type: application/gzip
+      
+      - name: Upload macOS arm64
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.REPO_TOKEN }}
+        with:
+          upload_url: ${{ github.event_name == 'workflow_dispatch' && needs.create_release.outputs.upload_url || github.event.release.upload_url }}
+          asset_path: ./releases/nano-whale-macos-arm64.tar.gz
+          asset_name: nano-whale-macos-arm64.tar.gz
+          asset_content_type: application/gzip
