@@ -26,6 +26,8 @@
 
 ---
 
+![Gif](/img/app.gif)
+
 ## 📦 Installation
 
 ### Option 1: One-Line Install (Recommended)
@@ -49,7 +51,7 @@ git clone https://github.com/Vriddhachalam/nano-whale.git
 cd nano-whale
 
 # Install dependencies
-bun install
+bun init -y | bun install | bun install neo-blessed
 
 # Run
 bun run start
