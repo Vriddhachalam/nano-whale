@@ -1,330 +1,137 @@
 # 🐳 Nano Whale - Lightweight Docker TUI
-[![Python Version](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+
+[![Bun](https://img.shields.io/badge/Bun-1.0%2B-black)](https://bun.sh)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Textual](https://img.shields.io/badge/built%20with-Textual-cyan.svg)](https://textual.textualize.io/)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-blue)](https://github.com/Vriddhachalam/nano-whale/releases)
 
 <p align="center">
-  <img src="/img/nano_whale_w_bg.png" alt="Nano Whale logo" >
+  <img src="img/nano_whale_w_bg.png" alt="Nano Whale logo">
 </p>
 
-> ⚠️ **DEPRECATION NOTICE**: The original Tkinter GUI version of Nano Whale has been deprecated. This repository now contains the new and improved **Terminal User Interface (TUI)** version built with Textual. For the legacy version, see the `legacy-tkinter` branch.
-
-Meet **Nano Whale TUI**! A blazingly fast, lightweight **Terminal User Interface** for managing Docker containers, images, and volumes. Built with [Textual](https://textual.textualize.io/), Nano Whale provides an elegant, keyboard-driven interface for Docker management without the overhead of Docker Desktop.
+**Nano Whale** is a blazingly fast, lightweight **Terminal User Interface (TUI)** for managing Docker containers, images, and volumes. Created as a compiled standalone binary, it requires **no external dependencies** (like Python or Node.js) to run on your machine.
 
 ---
 
 ## ✨ Features
 
-- **Blazingly Fast & Lightweight**: Minimal resource footprint, native WSL2 integration.
-- **Efficient Management**: Keyboard-driven TUI for containers, images, and volumes.
-- **Detailed Inspection**: Quickly view container info, environment, ports, volumes, and networks.
-- **Batch Operations**: Multi-select for streamlined management (start, stop, delete).
-- **Cross-Platform**: Works seamlessly on Windows (WSL), Linux, and macOS.
+- **🚀 Zero Dependencies**: Runs as a single binary executable. No Python/Pip required.
+- **⚡ Blazingly Fast**: Built with Bun and Neo-Blessed for instant startup and low memory usage.
+- **🖥️ Cross-Platform**: Native support for Windows (WSL2 integration), Linux, and macOS.
+- **⌨️ Keyboard-Driven**: Efficient VIM-style navigation and shortcuts.
+- **🛠️ Power Tools**:
+    - **Instant logs**: Stream logs in full screen (`l`) or pane.
+    - **Exec**: One-key shell access (`t`).
+    - **Stats**: Real-time CPU/Mem usage graphs.
+    - **Batch Actions**: Multi-select containers for bulk start/stop/remove.
 
 ---
 
-## 🖼️ Screenshots
-
-### Main Interface
-<p align="center">
-  <img src="/img/main.png" alt="Nano Whale TUI - Main Interface" width="900">
-</p>
-
-### Multi-Select Mode
-<p align="center">
-  <img src="/img/multi_select.png" alt="Nano Whale TUI - Multi-Select" width="900">
-</p>
-
-### Commands Panel
-<p align="center">
-  <img src="/img/commands_panel.png" alt="Nano Whale TUI - Commands Panel" width="900">
-</p>
-
----
+![Gif](/img/app.gif)
 
 ## 📦 Installation
 
-### Via pip (Recommended)
 
-```bash
-pip install nano-whale
-```
+### Option 1: One-Line Install (Recommended)
 
-### Via pipx (Isolated)
-
-```bash
-pipx install nano-whale
-```
-
-## From GitHub Releases
-
-### Via Windows Executable
-For Windows users who prefer a standalone executable without Python or `pip` installation, you can [download](https://github.com/Vriddhachalam/nano-whale/releases/latest/download/nano-whale-windows-latest.exe) the latest release directly from GitHub or follow the below PowerShell script for shell command.
+#### Windows (PowerShell)
 ```powershell
-# 1. Download the executable
-Invoke-WebRequest -Uri "https://github.com/Vriddhachalam/nano-whale/releases/latest/download/nano-whale-windows-latest.exe" -OutFile "nano-whale-windows-latest.exe"
-
-# 2. Move to C:\Tools and rename
-New-Item -Path "C:\Tools" -ItemType Directory -Force
-Move-Item .\nano-whale-windows-latest.exe C:\Tools\nano-whale.exe
-
-# 3. Add C:\Tools to PATH
-[System.Environment]::SetEnvironmentVariable("Path", $env:Path + ";C:\Tools", [System.EnvironmentVariableTarget]::Machine)
-
-# 4. Test installation (requires terminal restart if PATH was updated)
-nano-whale
+irm https://raw.githubusercontent.com/Vriddhachalam/nano-whale/js/install_win.sh | iex
 ```
----
 
-### Via Linux Executable
-For Linux users who prefer a standalone executable, download the latest release from GitHub using this bash script:
+#### Linux / macOS
+```bash
+curl -fsSL https://raw.githubusercontent.com/Vriddhachalam/nano-whale/js/install_linux_mac.sh | sh
+```
+
+### Option 2: Run with Bun
+If you have [Bun](https://bun.sh) installed:
 
 ```bash
-# 1. Download the executable
-curl -L -o nano-whale-ubuntu-latest https://github.com/Vriddhachalam/nano-whale/releases/latest/download/nano-whale-ubuntu-latest
+# Clone repo
+git clone https://github.com/Vriddhachalam/nano-whale.git
+cd nano-whale
 
-# 2. Make it executable
-chmod +x nano-whale-ubuntu-latest
+# Install dependencies
+bun init -y | bun install | bun install neo-blessed
 
-# 3. Move to /usr/local/bin with a clean name
-sudo mv nano-whale-ubuntu-latest /usr/local/bin/nano-whale
-
-# 4. Test installation
-nano-whale
+# Run
+bun run start
 ```
 
 ---
 
 ## 🚀 Usage
 
-Simply run:
-
 ```bash
+# If installed via binary
 nano-whale
-```
 
-Or run directly:
-
-```bash
-python nano_whale/main.py
+# If running from source
+bun run start
 ```
 
 ---
 
 ## ⌨️ Keyboard Shortcuts
 
-### Table Navigation
+### Navigation
 | Key | Action |
 |-----|--------|
-| `C` | Switch to **Containers** table |
-| `I` | Switch to **Images** table |
-| `V` | Switch to **Volumes** table |
-| `↑/↓` | Navigate rows |
-| `Page Up/Down` | Fast scroll |
-| `Home/End` | Jump to first/last row |
-| **Mouse Click** | Click anywhere on table section to switch |
+| `Tab` | Switch focus between lists |
+| `↑/↓` | Navigate items |
+| `PageUp/Down` | Scroll lists faster |
+| `Home/End` | Jump to top/bottom |
 
-### Detail Panel Tabs
+### Tabs (Context Aware)
 | Key | Action |
 |-----|--------|
-| `1` | **Info** tab - Container details |
-| `2` | **Env** tab - Environment variables |
-| `3` | **Ports** tab - Port mappings |
-| `4` | **Volumes** tab - Volume mounts |
-| `5` | **Networks** tab - Network configuration |
+| `Logs` | View Logs tab |
+| `Stats` | View Stats tab |
+| `Env` | View Environment Variables |
+| `Config` | View Inspection/Config |
+| `Top` | View Top Processes |
 
-### Container Operations
+### Actions
 | Key | Action |
 |-----|--------|
-| `S` | **Start** container(s) |
-| `X` | **Stop** container(s) |
-| `R` | **Restart** container(s) |
-| `D` | **Delete** selected item(s) |
-
-### Logs & Terminal
-| Key | Action |
-|-----|--------|
-| `L` | View **Logs** in-shell (suspends TUI) |
-| `Ctrl+L` | View **Logs** in new terminal window |
-| `T` | Launch **Terminal** in-shell (exec) |
-| `Ctrl+T` | Launch **Terminal** in new window |
-
-### Multi-Select & Batch Operations
-| Key | Action |
-|-----|--------|
-| `M` | **Mark/Unmark** current item |
-| *(then)* `S/X/R/D` | Perform action on all marked items |
-
-### Utilities
-| Key | Action |
-|-----|--------|
-| `A` | **Refresh** all tables |
-| `G` | Toggle **Stats** display in container list |
-| `P` | **Prune** menu (press twice to confirm) |
-| `Q` | **Quit** application |
+| `Enter` | **Inspect** / Expand details |
+| `s` | **Start** container |
+| `x` | **Stop** container |
+| `r` | **Restart** container |
+| `d` | **Delete** (Container/Image/Volume) |
+| `l` | **Fullscreen Logs** (Live stream) |
+| `t` | **Exec** (Enter shell) |
+| `a` | **Toggle Auto-scroll** (Logs) |
+| `F5` | **Manual Refresh** (Reload all data) |
+| `q` | **Quit** |
 
 ---
 
-### Viewing Logs / Exec into containers
+## 💻 Development
 
-**In-Shell (suspends TUI, Useful for non GUI servers):**
-1. Select a running container
-2. Press `L` or `T` Logs stream
-3. Press `Ctrl+C` or `Ctrl+D` to return to TUI
-
-<p align="center">
-  <img src="/img/in_shell_logs.png" alt="Nano Whale TUI - In-Shell Logs" width="900">
-</p>
-
-<p align="center">
-  <img src="/img/in_shell_exec_terminal.png" alt="Nano Whale TUI - In-Shell Exec Terminal" width="900">
-</p>
-
-
-**In New Window (TUI remains active):**
-1. Select a running container
-2. Press `Ctrl+L` or `Ctrl+T`
-
-<p align="center">
-  <img src="/img/new_shell_logs.png" alt="Nano Whale TUI - New Shell Logs" width="900">
-</p>
-
-<p align="center">
-  <img src="/img/new_shell_terminal.png" alt="Nano Whale TUI - New Shell Terminal" width="900">
-</p>
-
-
-### Cleaning Up System
-
-1. Press `P` - shows warning notification
-2. Press `P` again within 5 seconds to confirm
-3. Executes `docker system prune -a -f`
-4. Removes all unused containers, images, and volumes
-
-
-## 💻 Dev Zone: Running from Source
-
-### Development Setup
+Built using **Bun** and **Neo-Blessed**.
 
 ```bash
-# Clone the repository
+# Setup
 git clone https://github.com/Vriddhachalam/nano-whale.git
 cd nano-whale
+bun install
 
-# Create virtual environment
-python -m venv .venv
-.venv\Scripts\activate  # On Windows
-# source .venv/bin/activate  # On Linux/macOS
+# Dev Run
+bun run dev
 
-# Install dependencies
-pip install -r requirements.txt
-
-# Install in development mode
-pip install -e .
-
-# Run from source
-python nano_whale/main.py
-```
-
-### 📦 Building Portable Executable with Nuitka
-
-**Build Command:**
-
-```bash
-python -m nuitka --standalone --onefile --output-filename=nano-whale nano_whale/main.py
-```
-
-**Build Options Explained:**
-| Option | Description |
-|--------|-------------|
-| `--standalone` | Include all dependencies |
-| `--onefile` | Package everything into a single executable |
-| `--windows-console-mode=force` | Keep console window for TUI |
-| `--output-filename` | Name of the output executable |
-
-The portable executable can be distributed and run on any compatible system without Python installation!
-
----
-
-## 🐛 Troubleshooting
-
-### "wsl command not found" (Windows)
-
-```bash
-wsl --install
-# Restart computer after installation
-```
-
-### "Cannot connect to Docker daemon"
-
-**Linux/macOS:**
-```bash
-sudo systemctl start docker
-# or
-sudo service docker start
-```
-
-**Windows WSL:**
-```bash
-wsl sudo service docker start
-```
-
-### "Permission denied"
-
-```bash
-sudo usermod -aG docker $USER
-# Then log out and back in
+# Build Binaries
+bun run build.js
 ```
 
 ---
 
 ## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
----
+Contributions are welcome! Please submit a Pull Request.
 
 ## 📜 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-## 📚 Migration from Legacy GUI Version
-
-If you're upgrading from the old Tkinter GUI version:
-
-1. **No more .exe**: The new TUI version runs directly with Python
-2. **Keyboard-driven**: Learn the keyboard shortcuts for faster workflow
-3. **Better performance**: Even lighter resource usage than before
-4. **SSH compatible**: Now works over remote connections
-5. **New features**: Split-pane interface, container inspection tabs, multi-select
-
-The legacy Tkinter version can still be found in the `legacy-tkinter` branch, but it will no longer receive updates.
-
-### Legacy Version Screenshots (Deprecated)
-
-<p align="center">
-  <img src="/img/face.png" alt="Legacy GUI - Main" width="738">
-</p>
-<p align="center">
-  <img src="/img/images.png" alt="Legacy GUI - Images" width="738">
-</p>
-<p align="center">
-  <img src="/img/logs.png" alt="Legacy GUI - Logs" width="738">
-</p>
-<p align="center">
-  <img src="/img/terminal.png" alt="Legacy GUI - Terminal" width="738">
-</p>
+MIT License - see [LICENSE](LICENSE) for details.
 
 ---
-
-## ⭐ Star History
-
-If you find Nano Whale useful, please consider giving it a star on GitHub!
-
----
-
 **Made with ❤️ by Vriddhachalam S**
-
 *Swim fast, stay light! 🐳*
