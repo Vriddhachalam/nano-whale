@@ -1196,22 +1196,41 @@ function spawnNewWindow(cmd, label) {
   }
   
   // Linux
-  const terminals = [
-    `x-terminal-emulator -e ${cmd}`,
-    `gnome-terminal -- ${cmd}`,
-    `xterm -e ${cmd}`,
-    `konsole -e ${cmd}`,
-  ];
-  
-  for (const term of terminals) {
-    try {
-      const [command, ...args] = term.split(" ");
-      execSync(`which ${command}`, { stdio: "ignore" });
-      spawn(command, args, { detached: true, stdio: "ignore" });
-      notify(`Opened new terminal window`, "green");
-      return;
-    } catch (_) {
-      continue;
+  if (plat === "linux") {
+    const candidates = [
+      {
+        bin: "x-terminal-emulator",
+        args: ["-e", "bash", "-c", `${cmd}; exec bash`],
+      },
+      {
+        bin: "gnome-terminal",
+        args: ["--", "bash", "-c", `${cmd}; exec bash`],
+      },
+      {
+        bin: "xterm",
+        args: ["-T", label, "-e", `${cmd}; bash`],
+      },
+      {
+        bin: "konsole",
+        args: ["-e", "bash", "-c", `${cmd}; exec bash`],
+      },
+    ];
+
+    for (const t of candidates) {
+      try {
+        execSync(`which ${t.bin}`, { stdio: "ignore" });
+
+        // Spawn correctly with detached session
+        spawn(t.bin, t.args, {
+          detached: true,
+          stdio: "ignore"
+        });
+
+        notify(`Opened new terminal window`, "green");
+        return;
+      } catch (_) {
+        // Try next one
+      }
     }
   }
   
