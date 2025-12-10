@@ -99,7 +99,9 @@ bun run start
 | `r` | **Restart** container |
 | `d` | **Delete** (Container/Image/Volume) |
 | `l` | **Fullscreen Logs** (Live stream) |
+| `ctrl + l` | **Fullscreen Logs** (Live stream in new window) |
 | `t` | **Exec** (Enter shell) |
+| `ctrl + t` | **Exec** (Enter shell in new window) |
 | `a` | **Toggle Auto-scroll** (Logs) |
 | `F5` | **Manual Refresh** (Reload all data) |
 | `q` | **Quit** |
