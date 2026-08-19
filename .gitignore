@@ -1,14 +1,34 @@
-/.venv/
-/.lx_venv/
-/__pycache__/
-/*.build/
-/*.dist/
-/*.onefile-build/
-/*.exe
+# Build directories
 /build/
+/cmake-build-*/
+/out/
 /dist/
-*.spec
-decent_readme.md
-logo_full.png
-/node_modules/
 /releases/*
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+compile_commands.json
+
+# Object files
+*.o
+*.obj
+*.a
+*.lib
+
+# Executables
+*.exe
+nano-whale
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Old JS artifacts
+/node_modules/
+__pycache__/

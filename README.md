@@ -1,76 +1,78 @@
 # 🐳 Nano Whale - Lightweight Docker TUI
 
-[![Bun](https://img.shields.io/badge/Bun-1.0%2B-black)](https://bun.sh)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-blue)](https://github.com/Vriddhachalam/nano-whale/releases)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-blue)](https://github.com/Karthikeyan-070204/nano-whale/releases)
 
 <p align="center">
   <img src="img/nano_whale_w_bg.png" alt="Nano Whale logo">
 </p>
 
-**Nano Whale** is a blazingly fast, lightweight **Terminal User Interface (TUI)** for managing Docker containers, images, and volumes. Created as a compiled standalone binary, it requires **no external dependencies** (like Python or Node.js) to run on your machine.
+**Nano Whale** is a blazingly fast, lightweight **Terminal User Interface (TUI)** for managing Docker containers, images, and volumes. Completely rewritten from the ground up in native **C++**, it requires **no external dependencies** (like Python, Node.js, or Bun) to run on your machine.
 
 ---
 
 ## ✨ Features
 
-- **🚀 Zero Dependencies**: Runs as a single binary executable. No Python/Pip required.
-- **⚡ Blazingly Fast**: Built with Bun and Neo-Blessed for instant startup and low memory usage.
+- **🚀 Zero Dependencies**: Runs as a single binary executable. No runtimes required.
+- **⚡ Blazingly Fast**: Built with modern C++ and FTXUI for instant startup and virtually zero memory usage.
 - **🖥️ Cross-Platform**: Native support for Windows (WSL2 integration), Linux, and macOS.
 - **⌨️ Keyboard-Driven**: Efficient VIM-style navigation and shortcuts.
 - **🛠️ Power Tools**:
-    - **Instant logs**: Stream logs in full screen (`l`) or pane.
-    - **Exec**: One-key shell access (`t`).
-    - **Stats**: Real-time CPU/Mem usage graphs.
-    - **Batch Actions**: Multi-select containers for bulk start/stop/remove.
+    - **Dashboard**: Quick overview of running and stopped containers.
+    - **Deep Inspector**: Real-time CPU, Mem, and Network usage graphs.
+    - **System Prune**: Safe and easy bulk cleanup for dangling images and unused volumes.
+    - **File Explorer**: Browse your container's filesystem and download files straight to the host.
+    - **Docker Compose**: Full compose integration with live log streaming.
+    - **Instant Shell**: Drop into an interactive shell (`/bin/sh`) instantly.
 
 ---
 
-![Gif](/img/app.gif)
-
 ## 📦 Installation
-
 
 ### Option 1: One-Line Install (Recommended)
 
 #### Windows (PowerShell)
 ```powershell
-irm https://raw.githubusercontent.com/Vriddhachalam/nano-whale/master/install_win.sh | iex
+irm https://raw.githubusercontent.com/Karthikeyan-070204/nano-whale/master/install_win.ps1 | iex
 ```
 
 > [!NOTE]
-> For the best rendering experience on Windows, it is recommended to use **Git Bash** in **Windows Terminal** app. Avoid using `cmd` or `PowerShell` even in terminal app if possible to prevent rendering artifacts.
+> For the best rendering experience on Windows, it is recommended to use **Git Bash** in **Windows Terminal** app. Avoid using `cmd` or `PowerShell` even in the terminal app if possible to prevent rendering artifacts.
 
 #### Linux / macOS
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Vriddhachalam/nano-whale/master/install_linux_mac.sh | sh
+curl -fsSL https://raw.githubusercontent.com/Karthikeyan-070204/nano-whale/master/install_linux_mac.sh | sh
 ```
 
-### Option 2: Run with Bun
-If you have [Bun](https://bun.sh) installed:
+### Option 2: Build from Source
+
+If you have `CMake` and a modern C++ compiler installed:
 
 ```bash
 # Clone repo
-git clone https://github.com/Vriddhachalam/nano-whale.git
+git clone https://github.com/Karthikeyan-070204/nano-whale.git
 cd nano-whale
 
-# Install dependencies
-bun init -y | bun install | bun install neo-blessed
+# Configure and Build
+cmake -B build
+cmake --build build
 
 # Run
-bun run start
+./build/nano-whale
 ```
 
 ---
 
 ## 🚀 Usage
 
-```bash
-# If installed via binary
-nano-whale
+Ensure your Docker daemon is running, then run:
 
-# If running from source
-bun run start
+```bash
+# If running the downloaded binary
+./nano-whale
+
+# If running from source build
+./build/nano-whale
 ```
 
 ---
@@ -80,19 +82,9 @@ bun run start
 ### Navigation
 | Key | Action |
 |-----|--------|
-| `Tab` | Switch focus between lists |
-| `↑/↓` | Navigate items |
+| `Tab` / `Left/Right` | Switch between Top Tabs |
+| `↑/↓` | Navigate lists and menus |
 | `PageUp/Down` | Scroll lists faster |
-| `Home/End` | Jump to top/bottom |
-
-### Tabs (Context Aware)
-| Key | Action |
-|-----|--------|
-| `Logs` | View Logs tab |
-| `Stats` | View Stats tab |
-| `Env` | View Environment Variables |
-| `Config` | View Inspection/Config |
-| `Top` | View Top Processes |
 
 ### Actions
 | Key | Action |
@@ -103,31 +95,9 @@ bun run start
 | `r` | **Restart** container |
 | `d` | **Delete** (Container/Image/Volume) |
 | `l` | **Fullscreen Logs** (Live stream) |
-| `ctrl + l` | **Fullscreen Logs** (Live stream in new window) |
-| `t` | **Exec** (Enter shell) |
-| `ctrl + t` | **Exec** (Enter shell in new window) |
-| `a` | **Toggle Auto-scroll** (Logs) |
+| `t` | **Exec** (Enter shell inside container) |
 | `F5` | **Manual Refresh** (Reload all data) |
-| `q` | **Quit** |
-
----
-
-## 💻 Development
-
-Built using **Bun** and **Neo-Blessed**.
-
-```bash
-# Setup
-git clone https://github.com/Vriddhachalam/nano-whale.git
-cd nano-whale
-bun install
-
-# Dev Run
-bun run dev
-
-# Build Binaries
-bun run build.js
-```
+| `q` or `Esc` | **Go Back** / **Quit** |
 
 ---
 
@@ -138,5 +108,5 @@ Contributions are welcome! Please submit a Pull Request.
 MIT License - see [LICENSE](LICENSE) for details.
 
 ---
-**Made with ❤️ by Vriddhachalam S**
+**Made with ❤️ by Vriddhachalam S & Karthikeyan**
 *Swim fast, stay light! 🐳*
