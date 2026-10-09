@@ -9,7 +9,7 @@ Option 1: One-Line Install (Recommended)
 ### Windows (PowerShell)
 
 ```powershell
-irm https://raw.githubusercontent.com/Vriddhachalam/nano-whale/master/install_win.sh | iex
+irm https://raw.githubusercontent.com/Vriddhachalam/nano-whale/rust/install_win.sh | iex
 ```
 
 > **Note**
@@ -19,7 +19,19 @@ irm https://raw.githubusercontent.com/Vriddhachalam/nano-whale/master/install_wi
 ### Linux / macOS
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Vriddhachalam/nano-whale/master/install_linux_mac.sh | sh
+curl -fsSL https://raw.githubusercontent.com/Vriddhachalam/nano-whale/rust/install_linux_mac.sh | sh
+```
+
+## Uninstallation
+
+### Windows (PowerShell)
+```powershell
+irm https://raw.githubusercontent.com/Vriddhachalam/nano-whale/rust/uninstall_win.sh | iex
+```
+
+### Linux / macOS
+```bash
+curl -fsSL https://raw.githubusercontent.com/Vriddhachalam/nano-whale/rust/uninstall_linux_mac.sh | sh
 ```
 
 ## Requirements
