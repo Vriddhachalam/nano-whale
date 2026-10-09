@@ -1,0 +1,24 @@
+[package]
+name = "nano-whale"
+version = "2.0.0"
+edition = "2021"
+description = "Lightweight Docker TUI — Rust edition"
+license = "MIT"
+
+[[bin]]
+name = "nano-whale"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+arboard = "3.6.1"
+bollard = "0.18"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+clap = { version = "4", features = ["derive"] }
+crossterm = "0.28"
+futures = "0.3"
+ratatui = "0.29"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+tokio-stream = "0.1"

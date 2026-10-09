@@ -1,42 +1,57 @@
 #!/bin/sh
 set -e
 
-OS=$(uname -s)
-ARCH=$(uname -m)
+REPO="Vriddhachalam/nano-whale"
+BIN_NAME="nano-whale"
 
-case "$OS" in
-    Linux*) P="linux-x64" ;;
-    Darwin*)
-        if [ "$ARCH" = "arm64" ]; then
-            P="macos-arm64"
-        else
-            P="macos-x64"
-        fi
-        ;;
-    *) echo "Unsupported OS"; exit 1 ;;
+# Determine OS
+OS="$(uname -s)"
+case "${OS}" in
+    Linux*)     OS_STR="linux" ;;
+    Darwin*)    OS_STR="macos" ;;
+    *)          echo "Unsupported OS: ${OS}"; exit 1 ;;
 esac
 
-U="https://github.com/Vriddhachalam/nano-whale/releases/latest/download/nano-whale-$P.tar.gz"
-D="$HOME/.nano-whale"
-T="/tmp/nw.tar.gz"
+# Determine Architecture
+ARCH="$(uname -m)"
+case "${ARCH}" in
+    x86_64*|amd64*) ARCH_STR="x86_64" ;;
+    aarch64*|arm64*) ARCH_STR="arm64" ;;
+    *)              echo "Unsupported architecture: ${ARCH}"; exit 1 ;;
+esac
 
-command -v curl >/dev/null && curl -fsSL "$U" -o "$T" || wget -q "$U" -O "$T"
+ASSET_NAME="${BIN_NAME}-${OS_STR}-${ARCH_STR}"
 
-[ -d "$D" ] && rm -rf "$D"
-mkdir -p "$D"
+echo "Fetching latest release for ${ASSET_NAME}..."
+LATEST_URL=$(curl -s "https://api.github.com/repos/${REPO}/releases/latest" | grep -Eo "\"browser_download_url\": \"[^\"]*${ASSET_NAME}\"" | cut -d '"' -f 4 | head -n 1)
 
-tar -xzf "$T" -C "$D"
-
-chmod +x "$D/$P/nano-whale"
-
-rm -f "$T"
-
-# Link correct binary
-if [ -w "/usr/local/bin" ]; then
-    ln -sf "$D/$P/nano-whale" /usr/local/bin/nano-whale
-else
-    sudo ln -sf "$D/$P/nano-whale" /usr/local/bin/nano-whale \
-    || echo "Add to PATH: export PATH=\"\$HOME/.nano-whale/$P:\$PATH\""
+if [ -z "$LATEST_URL" ]; then
+    echo "Could not find a release asset for your platform (${ASSET_NAME})."
+    echo "Make sure a release exists in the repository."
+    exit 1
 fi
 
-echo "Installed. Run: nano-whale"
+echo "Downloading ${LATEST_URL}..."
+
+# Download to a temporary location
+TMP_DIR=$(mktemp -d)
+TMP_BIN="${TMP_DIR}/${BIN_NAME}"
+
+curl -fsSL "$LATEST_URL" -o "$TMP_BIN"
+chmod +x "$TMP_BIN"
+
+# Determine install location
+INSTALL_DIR="/usr/local/bin"
+if [ ! -w "$INSTALL_DIR" ]; then
+    INSTALL_DIR="$HOME/.local/bin"
+    mkdir -p "$INSTALL_DIR"
+fi
+
+echo "Installing to ${INSTALL_DIR}/${BIN_NAME}..."
+mv "$TMP_BIN" "${INSTALL_DIR}/${BIN_NAME}"
+rm -rf "$TMP_DIR"
+
+echo "Installation complete! Run '${BIN_NAME}' to start."
+if [ "$INSTALL_DIR" = "$HOME/.local/bin" ]; then
+    echo "Make sure ${INSTALL_DIR} is in your PATH."
+fi

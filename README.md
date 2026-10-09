@@ -1,142 +1,73 @@
-# 🐳 Nano Whale - Lightweight Docker TUI
+# nano-whale
 
-[![Bun](https://img.shields.io/badge/Bun-1.0%2B-black)](https://bun.sh)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-blue)](https://github.com/Vriddhachalam/nano-whale/releases)
+Lightweight Docker TUI built **exclusively** with **Rust** (100% Rust-only project). Powered by **ratatui**, **tokio**, and **bollard**.
 
-<p align="center">
-  <img src="img/nano_whale_w_bg.png" alt="Nano Whale logo">
-</p>
+## Installation
 
-**Nano Whale** is a blazingly fast, lightweight **Terminal User Interface (TUI)** for managing Docker containers, images, and volumes. Created as a compiled standalone binary, it requires **no external dependencies** (like Python or Node.js) to run on your machine.
+Option 1: One-Line Install (Recommended)
 
----
+### Windows (PowerShell)
 
-## ✨ Features
-
-- **🚀 Zero Dependencies**: Runs as a single binary executable. No Python/Pip required.
-- **⚡ Blazingly Fast**: Built with Bun and Neo-Blessed for instant startup and low memory usage.
-- **🖥️ Cross-Platform**: Native support for Windows (WSL2 integration), Linux, and macOS.
-- **⌨️ Keyboard-Driven**: Efficient VIM-style navigation and shortcuts.
-- **🛠️ Power Tools**:
-    - **Instant logs**: Stream logs in full screen (`l`) or pane.
-    - **Exec**: One-key shell access (`t`).
-    - **Stats**: Real-time CPU/Mem usage graphs.
-    - **Batch Actions**: Multi-select containers for bulk start/stop/remove.
-
----
-
-![Gif](/img/app.gif)
-
-## 📦 Installation
-
-
-### Option 1: One-Line Install (Recommended)
-
-#### Windows (PowerShell)
 ```powershell
 irm https://raw.githubusercontent.com/Vriddhachalam/nano-whale/master/install_win.sh | iex
 ```
 
-> [!NOTE]
-> For the best rendering experience on Windows, it is recommended to use **Git Bash** in **Windows Terminal** app. Avoid using `cmd` or `PowerShell` even in terminal app if possible to prevent rendering artifacts.
+> **Note**
+> For the best rendering experience on Windows, it is recommended to use **Git Bash** in **Windows Terminal** app.
+> Avoid using `cmd` or `PowerShell` even in terminal app if possible to prevent rendering artifacts.
 
-#### Linux / macOS
+### Linux / macOS
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Vriddhachalam/nano-whale/master/install_linux_mac.sh | sh
 ```
 
-### Option 2: Run with Bun
-If you have [Bun](https://bun.sh) installed:
+## Requirements
+
+- Rust 1.70+
+- Docker daemon (`docker ps` must work)
+
+## Build & run
 
 ```bash
-# Clone repo
-git clone https://github.com/Vriddhachalam/nano-whale.git
-cd nano-whale
-
-# Install dependencies
-bun init -y | bun install | bun install neo-blessed
-
-# Run
-bun run start
+cargo build --release
+./target/release/nano-whale
 ```
 
----
-
-## 🚀 Usage
+WSL (recommended on Windows):
 
 ```bash
-# If installed via binary
-nano-whale
-
-# If running from source
-bun run start
+cd nano-whale-rs
+cargo run --release
 ```
 
----
+## Shortcuts
 
-## ⌨️ Keyboard Shortcuts
-
-### Navigation
 | Key | Action |
 |-----|--------|
-| `Tab` | Switch focus between lists |
-| `↑/↓` | Navigate items |
-| `PageUp/Down` | Scroll lists faster |
-| `Home/End` | Jump to top/bottom |
+| `q` | Quit |
+| `←` / `→` | Tabs (Logs, Stats, Env, Config, Top) |
+| `↑` / `↓` | Navigate list |
+| `Tab` | Cycle panel focus |
+| `2`–`5` | Focus Containers / Images / Volumes / Networks |
+| `s` | Start / stop container |
+| `r` | Restart container |
+| `d` | Delete selected resource |
+| `m` | Mark / unmark |
+| `F5` | Refresh hint (lists poll in background) |
 
-### Tabs (Context Aware)
-| Key | Action |
-|-----|--------|
-| `Logs` | View Logs tab |
-| `Stats` | View Stats tab |
-| `Env` | View Environment Variables |
-| `Config` | View Inspection/Config |
-| `Top` | View Top Processes |
+## Performance
 
-### Actions
-| Key | Action |
-|-----|--------|
-| `Enter` | **Inspect** / Expand details |
-| `s` | **Start** container |
-| `x` | **Stop** container |
-| `r` | **Restart** container |
-| `d` | **Delete** (Container/Image/Volume) |
-| `l` | **Fullscreen Logs** (Live stream) |
-| `ctrl + l` | **Fullscreen Logs** (Live stream in new window) |
-| `t` | **Exec** (Enter shell) |
-| `ctrl + t` | **Exec** (Enter shell in new window) |
-| `a` | **Toggle Auto-scroll** (Logs) |
-| `F5` | **Manual Refresh** (Reload all data) |
-| `q` | **Quit** |
+When more than **6** containers are present (default), stats are collected only for the **selected** running container. Parallel `docker stats` is capped (default 4). The UI redraws only when state changes or at ~60 FPS max (`NW_TICK_MS`).
 
----
+### Environment variables
 
-## 💻 Development
-
-Built using **Bun** and **Neo-Blessed**.
-
-```bash
-# Setup
-git clone https://github.com/Vriddhachalam/nano-whale.git
-cd nano-whale
-bun install
-
-# Dev Run
-bun run dev
-
-# Build Binaries
-bun run build.js
-```
-
----
-
-## 🤝 Contributing
-Contributions are welcome! Please submit a Pull Request.
-
-## 📜 License
-MIT License - see [LICENSE](LICENSE) for details.
-
----
-**Made with ❤️ by Vriddhachalam S**
-*Swim fast, stay light! 🐳*
+| Variable | Default | Meaning |
+|----------|---------|---------|
+| `NW_STATS_ALL_CONTAINER_MAX` | `6` | Above this count, stats poll only the selection |
+| `NW_STATS_PARALLEL` | `4` | Max concurrent stats requests (1–8) |
+| `NW_STATS_SELECTIVE_INTERVAL` | `1` | Seconds between selective stats polls |
+| `NW_STATS_INTERVAL` | `2` | Seconds between full stats polls |
+| `NW_CONTAINER_INTERVAL` | `3` | Seconds between `docker ps` polls |
+| `NW_LOG_FLUSH_MS` | `120` | Throttle log UI updates |
+| `NW_TICK_MS` | `16` | Min frame interval (~60 FPS cap) |
